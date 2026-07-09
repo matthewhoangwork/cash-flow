@@ -20,6 +20,7 @@ import 'add_edit_transaction_screen.dart';
 import 'category_breakdown_screen.dart';
 import 'manage_categories_screen.dart';
 import 'manage_wallets_screen.dart';
+import 'monthly_expenses_screen.dart';
 
 enum _ChartGranularity { daily, weekly }
 
@@ -46,6 +47,13 @@ class HomeScreen extends ConsumerWidget {
             tooltip: 'Category breakdown',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CategoryBreakdownScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.calendar_month_outlined),
+            tooltip: 'Monthly expenses',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MonthlyExpensesScreen()),
             ),
           ),
           PopupMenuButton<VoidCallback>(
