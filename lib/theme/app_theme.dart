@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 /// Warm monochrome + muted-pastel palette, flat 1px-bordered surfaces,
@@ -18,6 +19,29 @@ ThemeData buildAppTheme() {
 
   return base.copyWith(
     scaffoldBackgroundColor: AppColors.canvas,
+    // Keeps Cupertino chrome (nav bars, segmented controls, buttons) on the
+    // app's ink/canvas palette instead of iOS system blue/white. The bar
+    // color is translucent on purpose: that's what turns on the native blur.
+    cupertinoOverrideTheme: const CupertinoThemeData(
+      primaryColor: AppColors.ink,
+      scaffoldBackgroundColor: AppColors.canvas,
+      barBackgroundColor: Color(0xE6FBFBFA),
+      textTheme: CupertinoTextThemeData(
+        primaryColor: AppColors.ink,
+        navTitleTextStyle: TextStyle(
+          color: AppColors.ink,
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.4,
+        ),
+        navLargeTitleTextStyle: TextStyle(
+          color: AppColors.ink,
+          fontSize: 34,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.4,
+        ),
+      ),
+    ),
     colorScheme: base.colorScheme.copyWith(
       surface: AppColors.surface,
       primary: AppColors.ink,
@@ -59,7 +83,7 @@ ThemeData buildAppTheme() {
         backgroundColor: AppColors.ink,
         foregroundColor: Colors.white,
         elevation: 0,
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
       ),

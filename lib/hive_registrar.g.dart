@@ -4,6 +4,7 @@
 
 import 'package:hive_ce/hive_ce.dart';
 import 'package:money_tracking/models/category.dart';
+import 'package:money_tracking/models/planned_expense.dart';
 import 'package:money_tracking/models/transaction.dart';
 import 'package:money_tracking/models/transaction_type.dart';
 import 'package:money_tracking/models/wallet.dart';
@@ -11,6 +12,7 @@ import 'package:money_tracking/models/wallet.dart';
 extension HiveRegistrar on HiveInterface {
   void registerAdapters() {
     registerAdapter(CategoryAdapter());
+    registerAdapter(PlannedExpenseAdapter());
     registerAdapter(TransactionAdapter());
     registerAdapter(TransactionTypeAdapter());
     registerAdapter(WalletAdapter());
@@ -20,6 +22,7 @@ extension HiveRegistrar on HiveInterface {
 extension IsolatedHiveRegistrar on IsolatedHiveInterface {
   void registerAdapters() {
     registerAdapter(CategoryAdapter());
+    registerAdapter(PlannedExpenseAdapter());
     registerAdapter(TransactionAdapter());
     registerAdapter(TransactionTypeAdapter());
     registerAdapter(WalletAdapter());

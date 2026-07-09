@@ -1,11 +1,11 @@
 {
-    "name": "Cash Flow",
-    "short_name": "Cash Flow",
+    "name": "Cash",
+    "short_name": "Cash",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FBFBFA",
     "theme_color": "#FBFBFA",
-    "description": "Cash Flow - track your income and expenses.",
+    "description": "Cash - track your income and expenses.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

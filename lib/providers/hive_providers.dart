@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../models/category.dart';
+import '../models/planned_expense.dart';
 import '../models/transaction.dart';
 import '../models/wallet.dart';
 
@@ -16,4 +17,8 @@ final transactionsBoxProvider = Provider<Box<Transaction>>((ref) {
 
 final walletsBoxProvider = Provider<Box<Wallet>>((ref) {
   throw UnimplementedError('walletsBoxProvider must be overridden in main()');
+});
+
+final plannedExpensesBoxProvider = Provider<Box<PlannedExpense>>((ref) {
+  throw UnimplementedError('plannedExpensesBoxProvider must be overridden in main()');
 });

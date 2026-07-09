@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/adaptive.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -77,7 +78,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'Cash Flow',
+                    'Cash',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
                   ),
@@ -113,7 +114,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ],
                   const SizedBox(height: 24),
-                  ElevatedButton(
+                  AdaptivePrimaryButton(
                     onPressed: _isSubmitting ? null : _submit,
                     child: Text(
                       _isSubmitting ? 'Please wait…' : (_isSignUp ? 'Create account' : 'Sign in'),

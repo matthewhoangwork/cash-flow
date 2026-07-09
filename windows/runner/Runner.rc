@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.matthewhoang" "\0"
-            VALUE "FileDescription", "Cash Flow" "\0"
+            VALUE "FileDescription", "Cash" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "Cash Flow" "\0"
+            VALUE "InternalName", "Cash" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.matthewhoang. All rights reserved." "\0"
             VALUE "OriginalFilename", "money_tracking.exe" "\0"
-            VALUE "ProductName", "Cash Flow" "\0"
+            VALUE "ProductName", "Cash" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

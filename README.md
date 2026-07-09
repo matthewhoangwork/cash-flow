@@ -1,4 +1,4 @@
-# Cash Flow
+# Cash
 
 A Flutter app for tracking income and expenses.
 
