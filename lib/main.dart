@@ -5,8 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'data/default_categories.dart';
-import 'data/default_wallet.dart';
 import 'models/category.dart';
 import 'models/planned_expense.dart';
 import 'models/transaction.dart';
@@ -38,8 +36,10 @@ Future<void> main() async {
   final walletsBox = await Hive.openBox<Wallet>('wallets');
   final pendingDeletesBox = await Hive.openBox<Map>('pending_deletes');
   final plannedExpensesBox = await Hive.openBox<PlannedExpense>('planned_expenses');
-  await seedDefaultCategoriesIfNeeded(categoriesBox);
-  await seedDefaultWalletIfNeeded(walletsBox, transactionsBox);
+  // Defaults are seeded lazily by SyncService, only once a pull confirms the
+  // signed-in account has no cloud data — seeding here unconditionally would
+  // create a fresh, differently-ID'd set of "defaults" on every new device,
+  // which then merges into the account as permanent duplicates.
 
   runApp(
     ProviderScope(
@@ -50,19 +50,19 @@ Future<void> main() async {
         pendingDeletesBoxProvider.overrideWithValue(pendingDeletesBox),
         plannedExpensesBoxProvider.overrideWithValue(plannedExpensesBox),
       ],
-      child: const CashFlowApp(),
+      child: const CashApp(),
     ),
   );
   WidgetsBinding.instance.addPostFrameCallback((_) => FlutterNativeSplash.remove());
 }
 
-class CashFlowApp extends StatelessWidget {
-  const CashFlowApp({super.key});
+class CashApp extends StatelessWidget {
+  const CashApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cash Flow',
+      title: 'Cash',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       home: const AuthGate(),

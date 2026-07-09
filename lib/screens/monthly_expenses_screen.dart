@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +11,8 @@ import '../providers/planned_expenses_provider.dart';
 import '../theme/app_theme.dart';
 import '../theme/category_style.dart';
 import '../utils/currency_format.dart';
+import '../widgets/adaptive.dart';
+import '../widgets/glass.dart';
 
 /// "Danh sách cần chi mỗi tháng" — a per-month checklist of planned/recurring
 /// expenses (rent, internet, ...). These are drafts only: they never become
@@ -20,7 +23,8 @@ class MonthlyExpensesScreen extends ConsumerStatefulWidget {
   const MonthlyExpensesScreen({super.key});
 
   @override
-  ConsumerState<MonthlyExpensesScreen> createState() => _MonthlyExpensesScreenState();
+  ConsumerState<MonthlyExpensesScreen> createState() =>
+      _MonthlyExpensesScreenState();
 }
 
 class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
@@ -45,7 +49,9 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
 
   Future<void> _cloneToNextMonth() async {
     final target = DateTime(_year, _month + 1);
-    final copied = await ref.read(plannedExpensesProvider.notifier).cloneMonth(
+    final copied = await ref
+        .read(plannedExpensesProvider.notifier)
+        .cloneMonth(
           fromYear: _year,
           fromMonth: _month,
           toYear: target.year,
@@ -57,19 +63,19 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
       _month = target.month;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Copied $copied item${copied == 1 ? '' : 's'} to ${DateFormat.yMMMM().format(target)}')),
+      SnackBar(
+        content: Text(
+          'Copied $copied item${copied == 1 ? '' : 's'} to ${DateFormat.yMMMM().format(target)}',
+        ),
+      ),
     );
   }
 
   void _openForm({PlannedExpense? item}) {
-    showModalBottomSheet(
+    showAdaptiveModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => _PlannedExpenseFormSheet(year: _year, month: _month, item: item),
+      builder: (_) =>
+          _PlannedExpenseFormSheet(year: _year, month: _month, item: item),
     );
   }
 
@@ -85,21 +91,23 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
     final total = items.fold<double>(0, (sum, item) => sum + item.amount);
     final monthLabel = DateFormat.yMMMM().format(DateTime(_year, _month));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Monthly expenses'),
-        actions: [
-          if (items.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.copy_all_outlined),
-              tooltip: 'Clone to next month',
-              onPressed: _cloneToNextMonth,
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
+    final isApple = isApplePlatform(context);
+
+    return AdaptiveSliverScaffold(
+      title: 'Monthly expenses',
+      largeTitle: false,
+      actions: [
+        if (items.isNotEmpty)
+          AdaptiveNavAction(
+            materialIcon: Icons.copy_all_outlined,
+            cupertinoIcon: CupertinoIcons.doc_on_doc,
+            tooltip: 'Clone to next month',
+            onPressed: _cloneToNextMonth,
+          ),
+      ],
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
             child: Column(
               children: [
@@ -107,7 +115,12 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.chevron_left),
+                      icon: Icon(
+                        isApple
+                            ? CupertinoIcons.chevron_left
+                            : Icons.chevron_left,
+                      ),
+                      iconSize: isApple ? 20 : 24,
                       onPressed: () => _shiftMonth(-1),
                     ),
                     SizedBox(
@@ -115,11 +128,19 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
                       child: Text(
                         monthLabel,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.chevron_right),
+                      icon: Icon(
+                        isApple
+                            ? CupertinoIcons.chevron_right
+                            : Icons.chevron_right,
+                      ),
+                      iconSize: isApple ? 20 : 24,
                       onPressed: () => _shiftMonth(1),
                     ),
                   ],
@@ -127,7 +148,10 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
                 const SizedBox(height: 4),
                 Text(
                   vndFormat.format(total),
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const Text(
                   'Planned total — not counted in balance',
@@ -136,50 +160,59 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
               ],
             ),
           ),
-          const Divider(height: 1),
-          Expanded(
-            child: items.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 32),
-                      child: Text(
-                        'No planned expenses yet. Add one below, or open a month '
-                        'that has items and clone it forward.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.muted),
-                      ),
+        ),
+        const SliverToBoxAdapter(child: Divider(height: 1)),
+        if (items.isEmpty)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  'No planned expenses yet. Add one below, or open a month '
+                  'that has items and clone it forward.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.only(top: 8, bottom: 96),
+            sliver: SliverList.separated(
+              itemCount: items.length,
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, indent: 20, endIndent: 20),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final category = item.categoryId == null
+                    ? null
+                    : findCategory(categories, item.categoryId!);
+                return Dismissible(
+                  key: ValueKey(item.id),
+                  direction: DismissDirection.endToStart,
+                  onDismissed: (_) => _delete(item),
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    color: const Color(0xFFFDEBEC),
+                    child: Icon(
+                      isApple ? CupertinoIcons.trash : Icons.delete_outline,
+                      size: 20,
+                      color: const Color(0xFF9F2F2D),
                     ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: items.length,
-                    separatorBuilder: (_, _) =>
-                        const Divider(height: 1, indent: 20, endIndent: 20),
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      final category =
-                          item.categoryId == null ? null : findCategory(categories, item.categoryId!);
-                      return Dismissible(
-                        key: ValueKey(item.id),
-                        direction: DismissDirection.endToStart,
-                        onDismissed: (_) => _delete(item),
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          color: const Color(0xFFFDEBEC),
-                          child: const Icon(Icons.delete_outline, color: Color(0xFF9F2F2D)),
-                        ),
-                        child: _PlannedExpenseTile(
-                          item: item,
-                          category: category,
-                          onTap: () => _openForm(item: item),
-                        ),
-                      );
-                    },
                   ),
+                  child: _PlannedExpenseTile(
+                    item: item,
+                    category: category,
+                    onTap: () => _openForm(item: item),
+                  ),
+                );
+              },
+            ),
           ),
-        ],
-      ),
+      ],
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openForm(),
         child: const Icon(Icons.add),
@@ -189,7 +222,11 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
 }
 
 class _PlannedExpenseTile extends StatelessWidget {
-  const _PlannedExpenseTile({required this.item, required this.category, required this.onTap});
+  const _PlannedExpenseTile({
+    required this.item,
+    required this.category,
+    required this.onTap,
+  });
 
   final PlannedExpense item;
   final Category? category;
@@ -222,13 +259,19 @@ class _PlannedExpenseTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    item.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   if (item.note.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
                         item.note,
-                        style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 13,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -249,17 +292,23 @@ class _PlannedExpenseTile extends StatelessWidget {
 }
 
 class _PlannedExpenseFormSheet extends ConsumerStatefulWidget {
-  const _PlannedExpenseFormSheet({required this.year, required this.month, this.item});
+  const _PlannedExpenseFormSheet({
+    required this.year,
+    required this.month,
+    this.item,
+  });
 
   final int year;
   final int month;
   final PlannedExpense? item;
 
   @override
-  ConsumerState<_PlannedExpenseFormSheet> createState() => _PlannedExpenseFormSheetState();
+  ConsumerState<_PlannedExpenseFormSheet> createState() =>
+      _PlannedExpenseFormSheetState();
 }
 
-class _PlannedExpenseFormSheetState extends ConsumerState<_PlannedExpenseFormSheet> {
+class _PlannedExpenseFormSheetState
+    extends ConsumerState<_PlannedExpenseFormSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _amountController;
@@ -273,7 +322,9 @@ class _PlannedExpenseFormSheetState extends ConsumerState<_PlannedExpenseFormShe
     super.initState();
     final item = widget.item;
     _nameController = TextEditingController(text: item?.name ?? '');
-    _amountController = TextEditingController(text: item?.amount.toStringAsFixed(0) ?? '');
+    _amountController = TextEditingController(
+      text: item?.amount.toStringAsFixed(0) ?? '',
+    );
     _noteController = TextEditingController(text: item?.note ?? '');
     _categoryId = item?.categoryId;
   }
@@ -315,7 +366,9 @@ class _PlannedExpenseFormSheetState extends ConsumerState<_PlannedExpenseFormShe
 
   @override
   Widget build(BuildContext context) {
-    final categories = ref.watch(categoriesByTypeProvider(TransactionType.expense));
+    final categories = ref.watch(
+      categoriesByTypeProvider(TransactionType.expense),
+    );
 
     return Padding(
       padding: EdgeInsets.only(
@@ -339,8 +392,9 @@ class _PlannedExpenseFormSheetState extends ConsumerState<_PlannedExpenseFormShe
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Name'),
               textCapitalization: TextCapitalization.sentences,
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'Enter a name' : null,
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'Enter a name'
+                  : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -349,7 +403,9 @@ class _PlannedExpenseFormSheetState extends ConsumerState<_PlannedExpenseFormShe
               decoration: const InputDecoration(labelText: 'Amount (₫)'),
               validator: (value) {
                 final parsed = double.tryParse(value ?? '');
-                if (parsed == null || parsed <= 0) return 'Enter a valid amount';
+                if (parsed == null || parsed <= 0) {
+                  return 'Enter a valid amount';
+                }
                 return null;
               },
             ),
@@ -357,10 +413,10 @@ class _PlannedExpenseFormSheetState extends ConsumerState<_PlannedExpenseFormShe
               const SizedBox(height: 16),
               Text(
                 'CATEGORY (OPTIONAL)',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelMedium
-                    ?.copyWith(color: AppColors.muted, letterSpacing: 0.06),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppColors.muted,
+                  letterSpacing: 0.06,
+                ),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -371,20 +427,26 @@ class _PlannedExpenseFormSheetState extends ConsumerState<_PlannedExpenseFormShe
                   final palette = CategoryPalette.of(category.paletteIndex);
                   return ChoiceChip(
                     selected: selected,
-                    onSelected: (_) =>
-                        setState(() => _categoryId = selected ? null : category.id),
+                    onSelected: (_) => setState(
+                      () => _categoryId = selected ? null : category.id,
+                    ),
                     label: Text(category.name),
                     labelStyle: TextStyle(
                       color: selected ? palette.foreground : AppColors.ink,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),
-                    avatar:
-                        Icon(categoryIcon(category.iconKey), size: 16, color: palette.foreground),
+                    avatar: Icon(
+                      categoryIcon(category.iconKey),
+                      size: 16,
+                      color: palette.foreground,
+                    ),
                     selectedColor: palette.background,
                     backgroundColor: AppColors.surface,
                     checkmarkColor: palette.foreground,
-                    side: BorderSide(color: selected ? palette.foreground : AppColors.border),
+                    side: BorderSide(
+                      color: selected ? palette.foreground : AppColors.border,
+                    ),
                   );
                 }).toList(),
               ),
@@ -395,7 +457,7 @@ class _PlannedExpenseFormSheetState extends ConsumerState<_PlannedExpenseFormShe
               decoration: const InputDecoration(labelText: 'Note (optional)'),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
+            AdaptivePrimaryButton(
               onPressed: _save,
               child: Text(_isEditing ? 'Save changes' : 'Add item'),
             ),

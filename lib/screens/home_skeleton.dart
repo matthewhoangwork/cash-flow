@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/glass.dart';
 
 /// Mirrors [HomeScreen]'s layout with pulsing placeholder blocks. Shown by
 /// [AuthGate] while session state is still resolving, so app start never
@@ -12,14 +13,17 @@ class HomeSkeleton extends StatefulWidget {
   State<HomeSkeleton> createState() => _HomeSkeletonState();
 }
 
-class _HomeSkeletonState extends State<HomeSkeleton> with SingleTickerProviderStateMixin {
+class _HomeSkeletonState extends State<HomeSkeleton>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 900),
   )..repeat(reverse: true);
 
-  late final Animation<double> _pulse = CurvedAnimation(parent: _controller, curve: Curves.easeInOut)
-      .drive(Tween(begin: 0.5, end: 1.0));
+  late final Animation<double> _pulse = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOut,
+  ).drive(Tween(begin: 0.5, end: 1.0));
 
   @override
   void dispose() {
@@ -29,24 +33,27 @@ class _HomeSkeletonState extends State<HomeSkeleton> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Cash Flow')),
-      body: FadeTransition(
-        opacity: _pulse,
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 96),
-          children: const [
-            _BalanceCardSkeleton(),
-            _ChartCardSkeleton(),
-            Divider(height: 1),
-            _SkeletonTile(),
-            _SkeletonTile(),
-            _SkeletonTile(),
-            _SkeletonTile(),
-            _SkeletonTile(),
-          ],
+    return AdaptiveSliverScaffold(
+      title: 'Cash',
+      slivers: [
+        SliverToBoxAdapter(
+          child: FadeTransition(
+            opacity: _pulse,
+            child: const Column(
+              children: [
+                _BalanceCardSkeleton(),
+                _ChartCardSkeleton(),
+                Divider(height: 1),
+                _SkeletonTile(),
+                _SkeletonTile(),
+                _SkeletonTile(),
+                _SkeletonTile(),
+                _SkeletonTile(),
+              ],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -79,11 +86,7 @@ class _BalanceCardSkeleton extends StatelessWidget {
             _SkeletonBox(width: 160, height: 30),
             SizedBox(height: 18),
             Row(
-              children: [
-                _SkeletonStat(),
-                SizedBox(width: 28),
-                _SkeletonStat(),
-              ],
+              children: [_SkeletonStat(), SizedBox(width: 28), _SkeletonStat()],
             ),
           ],
         ),
@@ -120,7 +123,11 @@ class _ChartCardSkeleton extends StatelessWidget {
             SizedBox(
               height: 190,
               width: double.infinity,
-              child: _SkeletonBox(width: double.infinity, height: 190, radius: 10),
+              child: _SkeletonBox(
+                width: double.infinity,
+                height: 190,
+                radius: 10,
+              ),
             ),
           ],
         ),
@@ -175,7 +182,11 @@ class _SkeletonTile extends StatelessWidget {
 }
 
 class _SkeletonBox extends StatelessWidget {
-  const _SkeletonBox({required this.width, required this.height, this.radius = 6});
+  const _SkeletonBox({
+    required this.width,
+    required this.height,
+    this.radius = 6,
+  });
 
   final double width;
   final double height;

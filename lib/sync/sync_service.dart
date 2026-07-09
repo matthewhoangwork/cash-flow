@@ -4,11 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/default_categories.dart';
+import '../data/default_wallet.dart';
 import '../models/category.dart';
+import '../models/planned_expense.dart';
 import '../models/transaction.dart';
 import '../models/wallet.dart';
 import '../providers/categories_provider.dart';
 import '../providers/hive_providers.dart';
+import '../providers/planned_expenses_provider.dart';
 import '../providers/transactions_provider.dart';
 import '../providers/wallets_provider.dart';
 import 'supabase_mappers.dart';
@@ -40,10 +44,29 @@ class SyncService {
     schedulePush();
   }
 
+  /// Pulls first so a fresh device sees any existing cloud data before
+  /// deciding whether this is a genuinely new account. Only then are
+  /// defaults seeded (a no-op once real data exists), and only then do we
+  /// push — otherwise a second device would seed its own "default"
+  /// categories/wallet locally and push them up as permanent duplicates
+  /// alongside the ones that already exist for this account.
   Future<void> syncNow() async {
     if (_userId == null) return;
-    await pushAll();
     await pullAll();
+    await _seedDefaultsIfEmpty();
+    await pushAll();
+  }
+
+  Future<void> _seedDefaultsIfEmpty() async {
+    final categoriesBox = _ref.read(categoriesBoxProvider);
+    final walletsBox = _ref.read(walletsBoxProvider);
+    final wasEmpty = categoriesBox.isEmpty || walletsBox.isEmpty;
+    await seedDefaultCategoriesIfNeeded(categoriesBox);
+    await seedDefaultWalletIfNeeded(walletsBox, _ref.read(transactionsBoxProvider));
+    if (wasEmpty) {
+      _ref.invalidate(categoriesProvider);
+      _ref.invalidate(walletsProvider);
+    }
   }
 
   Future<void> pushAll() async {
@@ -54,6 +77,7 @@ class SyncService {
       final walletsBox = _ref.read(walletsBoxProvider);
       final categoriesBox = _ref.read(categoriesBoxProvider);
       final transactionsBox = _ref.read(transactionsBoxProvider);
+      final plannedExpensesBox = _ref.read(plannedExpensesBoxProvider);
 
       await _backfillUpdatedAt<Wallet>(walletsBox, (w) => w.updatedAt, (w, t) => w.updatedAt = t);
       await _backfillUpdatedAt<Category>(
@@ -65,6 +89,11 @@ class SyncService {
         transactionsBox,
         (tx) => tx.updatedAt,
         (tx, t) => tx.updatedAt = t,
+      );
+      await _backfillUpdatedAt<PlannedExpense>(
+        plannedExpensesBox,
+        (p) => p.updatedAt,
+        (p, t) => p.updatedAt = t,
       );
 
       if (walletsBox.values.isNotEmpty) {
@@ -81,6 +110,11 @@ class SyncService {
         await client.from(
           'transactions',
         ).upsert([for (final t in transactionsBox.values) transactionToRow(t, userId)]);
+      }
+      if (plannedExpensesBox.values.isNotEmpty) {
+        await client.from('planned_expenses').upsert([
+          for (final p in plannedExpensesBox.values) plannedExpenseToRow(p, userId),
+        ]);
       }
 
       await _flushPendingDeletes(client);
@@ -126,6 +160,7 @@ class SyncService {
       final walletRows = await client.from('wallets').select();
       final categoryRows = await client.from('categories').select();
       final transactionRows = await client.from('transactions').select();
+      final plannedExpenseRows = await client.from('planned_expenses').select();
 
       await _mergeRows<Wallet>(
         rows: walletRows,
@@ -145,10 +180,17 @@ class SyncService {
         fromRow: transactionFromRow,
         updatedAtOf: (t) => t.updatedAt,
       );
+      await _mergeRows<PlannedExpense>(
+        rows: plannedExpenseRows,
+        box: _ref.read(plannedExpensesBoxProvider),
+        fromRow: plannedExpenseFromRow,
+        updatedAtOf: (p) => p.updatedAt,
+      );
 
       _ref.invalidate(walletsProvider);
       _ref.invalidate(categoriesProvider);
       _ref.invalidate(transactionsProvider);
+      _ref.invalidate(plannedExpensesProvider);
     } catch (_) {
       // Offline or transient failure — silently retried on the next trigger.
     }

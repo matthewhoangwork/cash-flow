@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../models/category.dart';
@@ -6,6 +7,7 @@ import '../models/transaction_type.dart';
 import '../theme/app_theme.dart';
 import '../theme/category_style.dart';
 import '../utils/currency_format.dart';
+import 'adaptive.dart';
 
 class TransactionTile extends StatelessWidget {
   const TransactionTile({
@@ -41,7 +43,13 @@ class TransactionTile extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         color: const Color(0xFFFDEBEC),
-        child: const Icon(Icons.delete_outline, color: Color(0xFF9F2F2D)),
+        child: Icon(
+          isApplePlatform(context)
+              ? CupertinoIcons.trash
+              : Icons.delete_outline,
+          size: 20,
+          color: const Color(0xFF9F2F2D),
+        ),
       ),
       child: InkWell(
         onTap: onTap,
@@ -76,7 +84,10 @@ class TransactionTile extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(
                           transaction.note,
-                          style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 13,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -90,14 +101,20 @@ class TransactionTile extends StatelessWidget {
                 children: [
                   Text(
                     '$sign${vndFormat.format(transaction.amount)}',
-                    style: TextStyle(fontWeight: FontWeight.w700, color: amountColor),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: amountColor,
+                    ),
                   ),
                   if (walletName != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
                         walletName!,
-                        style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                 ],

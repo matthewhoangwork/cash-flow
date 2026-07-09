@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/planned_expense.dart';
+import '../sync/sync_service.dart';
 import 'hive_providers.dart';
 
 const _uuid = Uuid();
@@ -34,6 +35,7 @@ class PlannedExpensesNotifier extends Notifier<List<PlannedExpense>> {
     );
     await ref.read(plannedExpensesBoxProvider).put(item.id, item);
     _refresh();
+    ref.read(syncServiceProvider).schedulePush();
   }
 
   Future<void> updateItem(
@@ -53,9 +55,11 @@ class PlannedExpensesNotifier extends Notifier<List<PlannedExpense>> {
       ..updatedAt = DateTime.now().toUtc();
     await item.save();
     _refresh();
+    ref.read(syncServiceProvider).schedulePush();
   }
 
   Future<void> deleteItem(String id) async {
+    await ref.read(syncServiceProvider).recordDelete('planned_expenses', id);
     await ref.read(plannedExpensesBoxProvider).delete(id);
     _refresh();
   }
@@ -85,6 +89,7 @@ class PlannedExpensesNotifier extends Notifier<List<PlannedExpense>> {
       await box.put(clone.id, clone);
     }
     _refresh();
+    ref.read(syncServiceProvider).schedulePush();
     return source.length;
   }
 }

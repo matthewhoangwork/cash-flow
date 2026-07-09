@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +10,8 @@ import '../providers/transactions_provider.dart';
 import '../providers/wallets_provider.dart';
 import '../theme/app_theme.dart';
 import '../theme/category_style.dart';
+import '../widgets/adaptive.dart';
+import '../widgets/glass.dart';
 
 class AddEditTransactionScreen extends ConsumerStatefulWidget {
   const AddEditTransactionScreen({super.key, this.transaction});
@@ -16,10 +19,12 @@ class AddEditTransactionScreen extends ConsumerStatefulWidget {
   final model.Transaction? transaction;
 
   @override
-  ConsumerState<AddEditTransactionScreen> createState() => _AddEditTransactionScreenState();
+  ConsumerState<AddEditTransactionScreen> createState() =>
+      _AddEditTransactionScreenState();
 }
 
-class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScreen> {
+class _AddEditTransactionScreenState
+    extends ConsumerState<AddEditTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
@@ -56,9 +61,9 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     final formValid = _formKey.currentState!.validate();
     if (!formValid || _categoryId == null) {
       if (_categoryId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pick a category')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Pick a category')));
       }
       return;
     }
@@ -92,7 +97,7 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final picked = await showAdaptiveDatePicker(
       context: context,
       initialDate: _date,
       firstDate: DateTime(2000),
@@ -109,7 +114,8 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
     final currentCategory = _categoryId == null
         ? null
         : findCategory(ref.watch(categoriesProvider), _categoryId!);
-    final displayedCategories = currentCategory != null &&
+    final displayedCategories =
+        currentCategory != null &&
             currentCategory.isArchived &&
             !categories.any((c) => c.id == currentCategory.id)
         ? [currentCategory, ...categories]
@@ -117,127 +123,155 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
 
     final activeWallets = ref.watch(activeWalletsProvider);
     final currentWallet = findWallet(ref.watch(walletsProvider), _walletId);
-    final displayedWallets = currentWallet != null &&
+    final displayedWallets =
+        currentWallet != null &&
             currentWallet.isArchived &&
             !activeWallets.any((w) => w.id == currentWallet.id)
         ? [currentWallet, ...activeWallets]
         : activeWallets;
 
-    return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? 'Edit transaction' : 'Add transaction')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-          children: [
-            SegmentedButton<TransactionType>(
-              segments: const [
-                ButtonSegment(value: TransactionType.expense, label: Text('Expense')),
-                ButtonSegment(value: TransactionType.income, label: Text('Income')),
+    return Form(
+      key: _formKey,
+      child: AdaptiveSliverScaffold(
+        title: _isEditing ? 'Edit transaction' : 'Add transaction',
+        largeTitle: false,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            sliver: SliverList.list(
+              children: [
+                AdaptiveSegmentedControl<TransactionType>(
+                  segments: const [
+                    (TransactionType.expense, 'Expense'),
+                    (TransactionType.income, 'Income'),
+                  ],
+                  value: _type,
+                  onChanged: (selected) {
+                    setState(() {
+                      _type = selected;
+                      _categoryId = null;
+                    });
+                  },
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Amount (₫)'),
+                  validator: (value) {
+                    final parsed = double.tryParse(value ?? '');
+                    if (parsed == null || parsed <= 0) {
+                      return 'Enter a valid amount';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'CATEGORY',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColors.muted,
+                    letterSpacing: 0.06,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: displayedCategories.map((category) {
+                    final selected = category.id == _categoryId;
+                    final palette = CategoryPalette.of(category.paletteIndex);
+                    final label = category.isArchived
+                        ? '${category.name} (archived)'
+                        : category.name;
+                    return ChoiceChip(
+                      selected: selected,
+                      onSelected: (_) =>
+                          setState(() => _categoryId = category.id),
+                      label: Text(label),
+                      labelStyle: TextStyle(
+                        color: selected ? palette.foreground : AppColors.ink,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                      avatar: Icon(
+                        categoryIcon(category.iconKey),
+                        size: 16,
+                        color: palette.foreground,
+                      ),
+                      selectedColor: palette.background,
+                      backgroundColor: AppColors.surface,
+                      checkmarkColor: palette.foreground,
+                      side: BorderSide(
+                        color: selected ? palette.foreground : AppColors.border,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'WALLET',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColors.muted,
+                    letterSpacing: 0.06,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: displayedWallets.map((wallet) {
+                    final selected = wallet.id == _walletId;
+                    final label = wallet.isArchived
+                        ? '${wallet.name} (archived)'
+                        : wallet.name;
+                    return ChoiceChip(
+                      selected: selected,
+                      onSelected: (_) => setState(() => _walletId = wallet.id),
+                      label: Text(label),
+                      labelStyle: TextStyle(
+                        color: selected ? Colors.white : AppColors.ink,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                      selectedColor: AppColors.ink,
+                      backgroundColor: AppColors.surface,
+                      checkmarkColor: Colors.white,
+                      side: BorderSide(
+                        color: selected ? AppColors.ink : AppColors.border,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Note (optional)',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Date'),
+                  subtitle: Text(DateFormat.yMMMd().format(_date)),
+                  trailing: Icon(
+                    isApplePlatform(context)
+                        ? CupertinoIcons.calendar
+                        : Icons.calendar_today_outlined,
+                    size: 18,
+                  ),
+                  onTap: _pickDate,
+                ),
+                const SizedBox(height: 24),
+                AdaptivePrimaryButton(
+                  onPressed: _submit,
+                  child: Text(_isEditing ? 'Save changes' : 'Add transaction'),
+                ),
               ],
-              selected: {_type},
-              onSelectionChanged: (selection) {
-                setState(() {
-                  _type = selection.first;
-                  _categoryId = null;
-                });
-              },
             ),
-            const SizedBox(height: 20),
-            TextFormField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Amount (₫)'),
-              validator: (value) {
-                final parsed = double.tryParse(value ?? '');
-                if (parsed == null || parsed <= 0) return 'Enter a valid amount';
-                return null;
-              },
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'CATEGORY',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: AppColors.muted, letterSpacing: 0.06),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: displayedCategories.map((category) {
-                final selected = category.id == _categoryId;
-                final palette = CategoryPalette.of(category.paletteIndex);
-                final label = category.isArchived ? '${category.name} (archived)' : category.name;
-                return ChoiceChip(
-                  selected: selected,
-                  onSelected: (_) => setState(() => _categoryId = category.id),
-                  label: Text(label),
-                  labelStyle: TextStyle(
-                    color: selected ? palette.foreground : AppColors.ink,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                  avatar: Icon(categoryIcon(category.iconKey), size: 16, color: palette.foreground),
-                  selectedColor: palette.background,
-                  backgroundColor: AppColors.surface,
-                  checkmarkColor: palette.foreground,
-                  side: BorderSide(color: selected ? palette.foreground : AppColors.border),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'WALLET',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: AppColors.muted, letterSpacing: 0.06),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: displayedWallets.map((wallet) {
-                final selected = wallet.id == _walletId;
-                final label = wallet.isArchived ? '${wallet.name} (archived)' : wallet.name;
-                return ChoiceChip(
-                  selected: selected,
-                  onSelected: (_) => setState(() => _walletId = wallet.id),
-                  label: Text(label),
-                  labelStyle: TextStyle(
-                    color: selected ? Colors.white : AppColors.ink,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                  selectedColor: AppColors.ink,
-                  backgroundColor: AppColors.surface,
-                  checkmarkColor: Colors.white,
-                  side: BorderSide(color: selected ? AppColors.ink : AppColors.border),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 20),
-            TextFormField(
-              controller: _noteController,
-              decoration: const InputDecoration(labelText: 'Note (optional)'),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Date'),
-              subtitle: Text(DateFormat.yMMMd().format(_date)),
-              trailing: const Icon(Icons.calendar_today_outlined, size: 18),
-              onTap: _pickDate,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _submit,
-              child: Text(_isEditing ? 'Save changes' : 'Add transaction'),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

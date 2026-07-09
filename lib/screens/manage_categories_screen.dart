@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,46 +8,53 @@ import '../providers/categories_provider.dart';
 import '../providers/transactions_provider.dart';
 import '../theme/app_theme.dart';
 import '../theme/category_style.dart';
+import '../widgets/adaptive.dart';
+import '../widgets/glass.dart';
 
 class ManageCategoriesScreen extends ConsumerStatefulWidget {
   const ManageCategoriesScreen({super.key});
 
   @override
-  ConsumerState<ManageCategoriesScreen> createState() => _ManageCategoriesScreenState();
+  ConsumerState<ManageCategoriesScreen> createState() =>
+      _ManageCategoriesScreenState();
 }
 
-class _ManageCategoriesScreenState extends ConsumerState<ManageCategoriesScreen> {
+class _ManageCategoriesScreenState
+    extends ConsumerState<ManageCategoriesScreen> {
   TransactionType _type = TransactionType.expense;
 
   void _openForm({Category? category}) {
-    showModalBottomSheet(
+    showAdaptiveModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (_) => _CategoryFormSheet(type: _type, category: category),
     );
   }
 
   Future<void> _confirmDelete(Category category) async {
-    final inUse = ref.read(transactionsProvider).any((t) => t.categoryId == category.id);
-    final confirmed = await showDialog<bool>(
+    final inUse = ref
+        .read(transactionsProvider)
+        .any((t) => t.categoryId == category.id);
+    final confirmed = await showAdaptiveDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => AlertDialog.adaptive(
         title: Text('Delete "${category.name}"?'),
         content: Text(
           inUse
               ? 'This category is used by existing transactions. It will be archived '
-                  'so those transactions keep showing "${category.name}", but it will '
-                  'no longer be available for new transactions.'
+                    'so those transactions keep showing "${category.name}", but it will '
+                    'no longer be available for new transactions.'
               : 'This category isn\'t used by any transaction and will be removed permanently.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          adaptiveDialogAction(
+            context: context,
             onPressed: () => Navigator.pop(context, true),
+            isDestructive: true,
             child: const Text('Delete'),
           ),
         ],
@@ -61,57 +69,78 @@ class _ManageCategoriesScreenState extends ConsumerState<ManageCategoriesScreen>
   Widget build(BuildContext context) {
     final categories = ref.watch(categoriesByTypeProvider(_type));
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Manage categories')),
-      body: Column(
-        children: [
-          Padding(
+    return AdaptiveSliverScaffold(
+      title: 'Manage categories',
+      largeTitle: false,
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: SegmentedButton<TransactionType>(
+            child: AdaptiveSegmentedControl<TransactionType>(
               segments: const [
-                ButtonSegment(value: TransactionType.expense, label: Text('Expense')),
-                ButtonSegment(value: TransactionType.income, label: Text('Income')),
+                (TransactionType.expense, 'Expense'),
+                (TransactionType.income, 'Income'),
               ],
-              selected: {_type},
-              onSelectionChanged: (selection) => setState(() => _type = selection.first),
+              value: _type,
+              onChanged: (selected) => setState(() => _type = selected),
             ),
           ),
-          Expanded(
-            child: categories.isEmpty
-                ? const Center(
-                    child: Text('No categories yet', style: TextStyle(color: AppColors.muted)),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: categories.length,
-                    separatorBuilder: (_, _) =>
-                        const Divider(height: 1, indent: 20, endIndent: 20),
-                    itemBuilder: (context, index) {
-                      final category = categories[index];
-                      final palette = CategoryPalette.of(category.paletteIndex);
-                      return ListTile(
-                        onTap: () => _openForm(category: category),
-                        leading: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: palette.background,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(categoryIcon(category.iconKey), size: 20, color: palette.foreground),
-                        ),
-                        title: Text(category.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, color: AppColors.muted),
-                          tooltip: 'Delete',
-                          onPressed: () => _confirmDelete(category),
-                        ),
-                      );
-                    },
+        ),
+        if (categories.isEmpty)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Text(
+                'No categories yet',
+                style: TextStyle(color: AppColors.muted),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.only(top: 8, bottom: 96),
+            sliver: SliverList.separated(
+              itemCount: categories.length,
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, indent: 20, endIndent: 20),
+              itemBuilder: (context, index) {
+                final category = categories[index];
+                final palette = CategoryPalette.of(category.paletteIndex);
+                return ListTile(
+                  onTap: () => _openForm(category: category),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: palette.background,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      categoryIcon(category.iconKey),
+                      size: 20,
+                      color: palette.foreground,
+                    ),
                   ),
+                  title: Text(
+                    category.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  trailing: IconButton(
+                    icon: Icon(
+                      isApplePlatform(context)
+                          ? CupertinoIcons.trash
+                          : Icons.delete_outline,
+                      size: 20,
+                      color: AppColors.muted,
+                    ),
+                    tooltip: 'Delete',
+                    onPressed: () => _confirmDelete(category),
+                  ),
+                );
+              },
+            ),
           ),
-        ],
-      ),
+      ],
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openForm(),
         child: const Icon(Icons.add),
@@ -199,13 +228,13 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
             ),
             const SizedBox(height: 16),
             if (!_isEditing) ...[
-              SegmentedButton<TransactionType>(
+              AdaptiveSegmentedControl<TransactionType>(
                 segments: const [
-                  ButtonSegment(value: TransactionType.expense, label: Text('Expense')),
-                  ButtonSegment(value: TransactionType.income, label: Text('Income')),
+                  (TransactionType.expense, 'Expense'),
+                  (TransactionType.income, 'Income'),
                 ],
-                selected: {_type},
-                onSelectionChanged: (selection) => setState(() => _type = selection.first),
+                value: _type,
+                onChanged: (selected) => setState(() => _type = selected),
               ),
               const SizedBox(height: 16),
             ],
@@ -213,16 +242,17 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Name'),
               textCapitalization: TextCapitalization.words,
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'Enter a name' : null,
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'Enter a name'
+                  : null,
             ),
             const SizedBox(height: 20),
             Text(
               'ICON',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: AppColors.muted, letterSpacing: 0.06),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: AppColors.muted,
+                letterSpacing: 0.06,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -237,16 +267,22 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: selected ? previewPalette.background : AppColors.canvas,
+                      color: selected
+                          ? previewPalette.background
+                          : AppColors.canvas,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: selected ? previewPalette.foreground : AppColors.border,
+                        color: selected
+                            ? previewPalette.foreground
+                            : AppColors.border,
                       ),
                     ),
                     child: Icon(
                       entry.value,
                       size: 18,
-                      color: selected ? previewPalette.foreground : AppColors.muted,
+                      color: selected
+                          ? previewPalette.foreground
+                          : AppColors.muted,
                     ),
                   ),
                 );
@@ -255,10 +291,10 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
             const SizedBox(height: 20),
             Text(
               'COLOR',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: AppColors.muted, letterSpacing: 0.06),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: AppColors.muted,
+                letterSpacing: 0.06,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -277,17 +313,21 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
                       color: palette.background,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: selected ? palette.foreground : Colors.transparent,
+                        color: selected
+                            ? palette.foreground
+                            : Colors.transparent,
                         width: 2,
                       ),
                     ),
-                    child: selected ? Icon(Icons.check, size: 16, color: palette.foreground) : null,
+                    child: selected
+                        ? Icon(Icons.check, size: 16, color: palette.foreground)
+                        : null,
                   ),
                 );
               }),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
+            AdaptivePrimaryButton(
               onPressed: _save,
               child: Text(_isEditing ? 'Save changes' : 'Add category'),
             ),
