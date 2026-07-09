@@ -11,15 +11,9 @@ import '../theme/app_theme.dart';
 import '../theme/category_style.dart';
 
 class AddEditTransactionScreen extends ConsumerStatefulWidget {
-  const AddEditTransactionScreen({super.key, this.transaction, this.cloneFrom});
+  const AddEditTransactionScreen({super.key, this.transaction});
 
   final model.Transaction? transaction;
-
-  /// Pre-fills the form (amount, category, wallet, note) from another
-  /// transaction without editing it — used by "Clone" so a recurring
-  /// expense can be re-logged for today without retyping it. Ignored when
-  /// [transaction] is set.
-  final model.Transaction? cloneFrom;
 
   @override
   ConsumerState<AddEditTransactionScreen> createState() => _AddEditTransactionScreenState();
@@ -41,15 +35,13 @@ class _AddEditTransactionScreenState extends ConsumerState<AddEditTransactionScr
   void initState() {
     super.initState();
     final transaction = widget.transaction;
-    final template = transaction ?? widget.cloneFrom;
-    _type = template?.type ?? TransactionType.expense;
-    _categoryId = template?.categoryId;
-    _walletId = template?.walletId ?? ref.read(defaultWalletProvider).id;
-    // Cloning always starts from today; editing keeps the original date.
+    _type = transaction?.type ?? TransactionType.expense;
+    _categoryId = transaction?.categoryId;
+    _walletId = transaction?.walletId ?? ref.read(defaultWalletProvider).id;
     _date = transaction?.date ?? DateTime.now();
-    if (template != null) {
-      _amountController.text = template.amount.toStringAsFixed(0);
-      _noteController.text = template.note;
+    if (transaction != null) {
+      _amountController.text = transaction.amount.toStringAsFixed(0);
+      _noteController.text = transaction.note;
     }
   }
 

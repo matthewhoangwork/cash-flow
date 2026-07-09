@@ -3,19 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../models/category.dart';
-import '../models/transaction.dart';
+import '../models/planned_expense.dart';
 import '../models/transaction_type.dart';
 import '../providers/categories_provider.dart';
-import '../providers/transactions_provider.dart';
-import '../providers/wallets_provider.dart';
+import '../providers/planned_expenses_provider.dart';
 import '../theme/app_theme.dart';
 import '../theme/category_style.dart';
 import '../utils/currency_format.dart';
-import 'add_edit_transaction_screen.dart';
 
-/// Shows every expense logged in a given month ("Danh sách cần chi mỗi
-/// tháng") with a per-item Clone action that re-logs a recurring expense
-/// (same amount/category/wallet/note, dated today) without retyping it.
+/// "Danh sách cần chi mỗi tháng" — a per-month checklist of planned/recurring
+/// expenses (rent, internet, ...). These are drafts only: they never become
+/// [Transaction]s and never affect balance or income/expense totals. Each
+/// month starts empty; "Clone to next month" copies the current month's
+/// items forward so you don't retype the same list every month.
 class MonthlyExpensesScreen extends ConsumerStatefulWidget {
   const MonthlyExpensesScreen({super.key});
 
@@ -24,150 +24,180 @@ class MonthlyExpensesScreen extends ConsumerStatefulWidget {
 }
 
 class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
-  late DateTime _month;
+  late int _year;
+  late int _month;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
-    _month = DateTime(now.year, now.month);
+    _year = now.year;
+    _month = now.month;
   }
 
   void _shiftMonth(int delta) {
-    setState(() => _month = DateTime(_month.year, _month.month + delta));
+    setState(() {
+      final shifted = DateTime(_year, _month + delta);
+      _year = shifted.year;
+      _month = shifted.month;
+    });
   }
 
-  void _clone(Transaction transaction) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => AddEditTransactionScreen(cloneFrom: transaction)),
+  Future<void> _cloneToNextMonth() async {
+    final target = DateTime(_year, _month + 1);
+    final copied = await ref.read(plannedExpensesProvider.notifier).cloneMonth(
+          fromYear: _year,
+          fromMonth: _month,
+          toYear: target.year,
+          toMonth: target.month,
+        );
+    if (!mounted) return;
+    setState(() {
+      _year = target.year;
+      _month = target.month;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Copied $copied item${copied == 1 ? '' : 's'} to ${DateFormat.yMMMM().format(target)}')),
     );
+  }
+
+  void _openForm({PlannedExpense? item}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _PlannedExpenseFormSheet(year: _year, month: _month, item: item),
+    );
+  }
+
+  Future<void> _delete(PlannedExpense item) async {
+    await ref.read(plannedExpensesProvider.notifier).deleteItem(item.id);
   }
 
   @override
   Widget build(BuildContext context) {
-    final transactions = ref.watch(transactionsProvider);
+    final allItems = ref.watch(plannedExpensesProvider);
     final categories = ref.watch(categoriesProvider);
-    final wallets = ref.watch(walletsProvider);
-    final showWalletTag = ref.watch(activeWalletsProvider).length > 1;
-
-    final expenses = transactions
-        .where((t) =>
-            t.type == TransactionType.expense &&
-            t.date.year == _month.year &&
-            t.date.month == _month.month)
-        .toList();
-    final total = expenses.fold<double>(0, (sum, t) => sum + t.amount);
+    final items = plannedExpensesForMonth(allItems, _year, _month);
+    final total = items.fold<double>(0, (sum, item) => sum + item.amount);
+    final monthLabel = DateFormat.yMMMM().format(DateTime(_year, _month));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Monthly expenses')),
+      appBar: AppBar(
+        title: const Text('Monthly expenses'),
+        actions: [
+          if (items.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.copy_all_outlined),
+              tooltip: 'Clone to next month',
+              onPressed: _cloneToNextMonth,
+            ),
+        ],
+      ),
       body: Column(
         children: [
-          _MonthHeader(month: _month, total: total, onPrevious: () => _shiftMonth(-1),
-              onNext: () => _shiftMonth(1)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () => _shiftMonth(-1),
+                    ),
+                    SizedBox(
+                      width: 160,
+                      child: Text(
+                        monthLabel,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () => _shiftMonth(1),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  vndFormat.format(total),
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                ),
+                const Text(
+                  'Planned total — not counted in balance',
+                  style: TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
           const Divider(height: 1),
           Expanded(
-            child: expenses.isEmpty
+            child: items.isEmpty
                 ? const Center(
-                    child: Text('No expenses this month', style: TextStyle(color: AppColors.muted)),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        'No planned expenses yet. Add one below, or open a month '
+                        'that has items and clone it forward.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.muted),
+                      ),
+                    ),
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: expenses.length,
+                    itemCount: items.length,
                     separatorBuilder: (_, _) =>
                         const Divider(height: 1, indent: 20, endIndent: 20),
                     itemBuilder: (context, index) {
-                      final transaction = expenses[index];
-                      return _MonthlyExpenseTile(
-                        transaction: transaction,
-                        category: findCategory(categories, transaction.categoryId),
-                        walletName:
-                            showWalletTag ? findWallet(wallets, transaction.walletId)?.name : null,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => AddEditTransactionScreen(transaction: transaction),
-                          ),
+                      final item = items[index];
+                      final category =
+                          item.categoryId == null ? null : findCategory(categories, item.categoryId!);
+                      return Dismissible(
+                        key: ValueKey(item.id),
+                        direction: DismissDirection.endToStart,
+                        onDismissed: (_) => _delete(item),
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          color: const Color(0xFFFDEBEC),
+                          child: const Icon(Icons.delete_outline, color: Color(0xFF9F2F2D)),
                         ),
-                        onClone: () => _clone(transaction),
+                        child: _PlannedExpenseTile(
+                          item: item,
+                          category: category,
+                          onTap: () => _openForm(item: item),
+                        ),
                       );
                     },
                   ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _MonthHeader extends StatelessWidget {
-  const _MonthHeader({
-    required this.month,
-    required this.total,
-    required this.onPrevious,
-    required this.onNext,
-  });
-
-  final DateTime month;
-  final double total;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(icon: const Icon(Icons.chevron_left), onPressed: onPrevious),
-              SizedBox(
-                width: 160,
-                child: Text(
-                  DateFormat.yMMMM().format(month),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-              ),
-              IconButton(icon: const Icon(Icons.chevron_right), onPressed: onNext),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            vndFormat.format(total),
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.expense),
-          ),
-          const Text('Total expenses', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _openForm(),
+        child: const Icon(Icons.add),
       ),
     );
   }
 }
 
-class _MonthlyExpenseTile extends StatelessWidget {
-  const _MonthlyExpenseTile({
-    required this.transaction,
-    required this.category,
-    required this.onTap,
-    required this.onClone,
-    this.walletName,
-  });
+class _PlannedExpenseTile extends StatelessWidget {
+  const _PlannedExpenseTile({required this.item, required this.category, required this.onTap});
 
-  final Transaction transaction;
+  final PlannedExpense item;
   final Category? category;
   final VoidCallback onTap;
-  final VoidCallback onClone;
-  final String? walletName;
 
   @override
   Widget build(BuildContext context) {
     final palette = CategoryPalette.of(category?.paletteIndex ?? 7);
-    final subtitle = [
-      DateFormat.MMMd().format(transaction.date),
-      if (walletName != null) walletName!,
-      if (transaction.note.isNotEmpty) transaction.note,
-    ].join(' · ');
-
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -192,29 +222,182 @@ class _MonthlyExpenseTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    category?.name ?? 'Uncategorized',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: AppColors.muted, fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  if (item.note.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        item.note,
+                        style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
             Text(
-              '-${vndFormat.format(transaction.amount)}',
-              style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.expense),
+              vndFormat.format(item.amount),
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
-            IconButton(
-              icon: const Icon(Icons.copy_outlined, size: 18, color: AppColors.muted),
-              tooltip: 'Clone',
-              onPressed: onClone,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlannedExpenseFormSheet extends ConsumerStatefulWidget {
+  const _PlannedExpenseFormSheet({required this.year, required this.month, this.item});
+
+  final int year;
+  final int month;
+  final PlannedExpense? item;
+
+  @override
+  ConsumerState<_PlannedExpenseFormSheet> createState() => _PlannedExpenseFormSheetState();
+}
+
+class _PlannedExpenseFormSheetState extends ConsumerState<_PlannedExpenseFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _amountController;
+  late final TextEditingController _noteController;
+  String? _categoryId;
+
+  bool get _isEditing => widget.item != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.item;
+    _nameController = TextEditingController(text: item?.name ?? '');
+    _amountController = TextEditingController(text: item?.amount.toStringAsFixed(0) ?? '');
+    _noteController = TextEditingController(text: item?.note ?? '');
+    _categoryId = item?.categoryId;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _amountController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    final notifier = ref.read(plannedExpensesProvider.notifier);
+    final name = _nameController.text.trim();
+    final amount = double.parse(_amountController.text);
+    final note = _noteController.text.trim();
+    if (_isEditing) {
+      await notifier.updateItem(
+        widget.item!.id,
+        name: name,
+        amount: amount,
+        categoryId: _categoryId,
+        note: note,
+      );
+    } else {
+      await notifier.addItem(
+        name: name,
+        amount: amount,
+        year: widget.year,
+        month: widget.month,
+        categoryId: _categoryId,
+        note: note,
+      );
+    }
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = ref.watch(categoriesByTypeProvider(TransactionType.expense));
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _isEditing ? 'Edit planned expense' : 'New planned expense',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Name'),
+              textCapitalization: TextCapitalization.sentences,
+              validator: (value) =>
+                  (value == null || value.trim().isEmpty) ? 'Enter a name' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Amount (₫)'),
+              validator: (value) {
+                final parsed = double.tryParse(value ?? '');
+                if (parsed == null || parsed <= 0) return 'Enter a valid amount';
+                return null;
+              },
+            ),
+            if (categories.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'CATEGORY (OPTIONAL)',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelMedium
+                    ?.copyWith(color: AppColors.muted, letterSpacing: 0.06),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: categories.map((category) {
+                  final selected = category.id == _categoryId;
+                  final palette = CategoryPalette.of(category.paletteIndex);
+                  return ChoiceChip(
+                    selected: selected,
+                    onSelected: (_) =>
+                        setState(() => _categoryId = selected ? null : category.id),
+                    label: Text(category.name),
+                    labelStyle: TextStyle(
+                      color: selected ? palette.foreground : AppColors.ink,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                    avatar:
+                        Icon(categoryIcon(category.iconKey), size: 16, color: palette.foreground),
+                    selectedColor: palette.background,
+                    backgroundColor: AppColors.surface,
+                    checkmarkColor: palette.foreground,
+                    side: BorderSide(color: selected ? palette.foreground : AppColors.border),
+                  );
+                }).toList(),
+              ),
+            ],
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _noteController,
+              decoration: const InputDecoration(labelText: 'Note (optional)'),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _save,
+              child: Text(_isEditing ? 'Save changes' : 'Add item'),
             ),
           ],
         ),
