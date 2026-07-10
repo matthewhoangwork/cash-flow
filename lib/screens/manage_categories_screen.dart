@@ -22,12 +22,21 @@ class ManageCategoriesScreen extends ConsumerStatefulWidget {
 class _ManageCategoriesScreenState
     extends ConsumerState<ManageCategoriesScreen> {
   TransactionType _type = TransactionType.expense;
+  bool _selecting = false;
+  final Set<String> _selectedIds = {};
 
   void _openForm({Category? category}) {
     showAdaptiveModalBottomSheet(
       context: context,
       builder: (_) => _CategoryFormSheet(type: _type, category: category),
     );
+  }
+
+  void _cancelSelection() {
+    setState(() {
+      _selecting = false;
+      _selectedIds.clear();
+    });
   }
 
   Future<void> _confirmDelete(Category category) async {
@@ -65,6 +74,37 @@ class _ManageCategoriesScreenState
     }
   }
 
+  Future<void> _confirmBulkDelete() async {
+    final count = _selectedIds.length;
+    final confirmed = await showAdaptiveDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog.adaptive(
+        title: Text('Delete $count categor${count == 1 ? 'y' : 'ies'}?'),
+        content: const Text(
+          'Categories still used by existing transactions are archived '
+          'instead of removed, so those transactions keep showing their name.',
+        ),
+        actions: [
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, true),
+            isDestructive: true,
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(categoriesProvider.notifier).deleteCategories(_selectedIds);
+    if (!mounted) return;
+    _cancelSelection();
+  }
+
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(categoriesByTypeProvider(_type));
@@ -72,6 +112,25 @@ class _ManageCategoriesScreenState
     return AdaptiveSliverScaffold(
       title: 'Manage categories',
       largeTitle: false,
+      actions: [
+        SelectionToggleAction(
+          selecting: _selecting,
+          onPressed: () {
+            if (_selecting) {
+              _cancelSelection();
+            } else {
+              setState(() => _selecting = true);
+            }
+          },
+        ),
+      ],
+      bottomBar: _selecting
+          ? SelectionBar(
+              count: _selectedIds.length,
+              onCancel: _cancelSelection,
+              onDelete: _selectedIds.isEmpty ? null : _confirmBulkDelete,
+            )
+          : null,
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
@@ -106,36 +165,64 @@ class _ManageCategoriesScreenState
               itemBuilder: (context, index) {
                 final category = categories[index];
                 final palette = CategoryPalette.of(category.paletteIndex);
+                final selected = _selectedIds.contains(category.id);
                 return ListTile(
-                  onTap: () => _openForm(category: category),
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: palette.background,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      categoryIcon(category.iconKey),
-                      size: 20,
-                      color: palette.foreground,
-                    ),
+                  onTap: _selecting
+                      ? () => setState(() {
+                          if (!_selectedIds.remove(category.id)) {
+                            _selectedIds.add(category.id);
+                          }
+                        })
+                      : () => _openForm(category: category),
+                  leading: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_selecting) ...[
+                        Icon(
+                          selected
+                              ? (isApplePlatform(context)
+                                    ? CupertinoIcons.checkmark_circle_fill
+                                    : Icons.check_circle)
+                              : (isApplePlatform(context)
+                                    ? CupertinoIcons.circle
+                                    : Icons.radio_button_unchecked),
+                          size: 24,
+                          color: selected ? AppColors.ink : AppColors.muted,
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: palette.background,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          categoryIcon(category.iconKey),
+                          size: 20,
+                          color: palette.foreground,
+                        ),
+                      ),
+                    ],
                   ),
                   title: Text(
                     category.name,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  trailing: IconButton(
-                    icon: Icon(
-                      isApplePlatform(context)
-                          ? CupertinoIcons.trash
-                          : Icons.delete_outline,
-                      size: 20,
-                      color: AppColors.muted,
-                    ),
-                    tooltip: 'Delete',
-                    onPressed: () => _confirmDelete(category),
-                  ),
+                  trailing: _selecting
+                      ? null
+                      : IconButton(
+                          icon: Icon(
+                            isApplePlatform(context)
+                                ? CupertinoIcons.trash
+                                : Icons.delete_outline,
+                            size: 20,
+                            color: AppColors.muted,
+                          ),
+                          tooltip: 'Delete',
+                          onPressed: () => _confirmDelete(category),
+                        ),
                 );
               },
             ),

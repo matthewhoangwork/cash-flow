@@ -77,6 +77,16 @@ class WalletsNotifier extends Notifier<List<Wallet>> {
       return DeleteWalletResult.deleted;
     }
   }
+
+  /// Bulk version of [deleteWallet]; returns each id's outcome in order so
+  /// the caller can summarize results (e.g. "2 deleted, 1 archived").
+  Future<List<DeleteWalletResult>> deleteWallets(Iterable<String> ids) async {
+    final results = <DeleteWalletResult>[];
+    for (final id in ids) {
+      results.add(await deleteWallet(id));
+    }
+    return results;
+  }
 }
 
 final walletsProvider = NotifierProvider<WalletsNotifier, List<Wallet>>(WalletsNotifier.new);

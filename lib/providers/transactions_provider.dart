@@ -71,6 +71,16 @@ class TransactionsNotifier extends Notifier<List<Transaction>> {
     await ref.read(transactionsBoxProvider).delete(id);
     _refresh();
   }
+
+  Future<void> deleteTransactions(Iterable<String> ids) async {
+    final syncService = ref.read(syncServiceProvider);
+    final box = ref.read(transactionsBoxProvider);
+    for (final id in ids) {
+      await syncService.recordDelete('transactions', id);
+      await box.delete(id);
+    }
+    _refresh();
+  }
 }
 
 final transactionsProvider =
