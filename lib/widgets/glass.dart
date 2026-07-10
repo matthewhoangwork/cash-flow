@@ -144,6 +144,7 @@ class AdaptiveSliverScaffold extends StatelessWidget {
     required this.slivers,
     this.actions,
     this.floatingActionButton,
+    this.bottomBar,
     this.largeTitle = true,
     super.key,
   });
@@ -152,6 +153,10 @@ class AdaptiveSliverScaffold extends StatelessWidget {
   final List<Widget> slivers;
   final List<Widget>? actions;
   final Widget? floatingActionButton;
+
+  /// A bar pinned below the scrollable content, e.g. [SelectionBar] while
+  /// multi-select is active. Null hides it.
+  final Widget? bottomBar;
   final bool largeTitle;
 
   @override
@@ -160,6 +165,7 @@ class AdaptiveSliverScaffold extends StatelessWidget {
       return Scaffold(
         appBar: AppBar(title: Text(title), actions: actions),
         body: CustomScrollView(slivers: slivers),
+        bottomNavigationBar: bottomBar,
         floatingActionButton: floatingActionButton,
       );
     }
@@ -195,6 +201,7 @@ class AdaptiveSliverScaffold extends StatelessWidget {
             ),
           ],
         ),
+        bottomNavigationBar: bottomBar,
         floatingActionButton: floatingActionButton,
       );
     }
@@ -217,6 +224,7 @@ class AdaptiveSliverScaffold extends StatelessWidget {
           ),
         ],
       ),
+      bottomNavigationBar: bottomBar,
       floatingActionButton: floatingActionButton,
     );
   }

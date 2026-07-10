@@ -11,21 +11,32 @@ import '../widgets/adaptive.dart';
 import '../widgets/glass.dart';
 import 'wallet_detail_screen.dart';
 
-class ManageWalletsScreen extends ConsumerWidget {
+class ManageWalletsScreen extends ConsumerStatefulWidget {
   const ManageWalletsScreen({super.key});
 
-  void _openForm(BuildContext context, {Wallet? wallet}) {
+  @override
+  ConsumerState<ManageWalletsScreen> createState() => _ManageWalletsScreenState();
+}
+
+class _ManageWalletsScreenState extends ConsumerState<ManageWalletsScreen> {
+  bool _selecting = false;
+  final Set<String> _selectedIds = {};
+
+  void _cancelSelection() {
+    setState(() {
+      _selecting = false;
+      _selectedIds.clear();
+    });
+  }
+
+  void _openForm({Wallet? wallet}) {
     showAdaptiveModalBottomSheet(
       context: context,
       builder: (_) => _WalletFormSheet(wallet: wallet),
     );
   }
 
-  Future<void> _delete(
-    BuildContext context,
-    WidgetRef ref,
-    Wallet wallet,
-  ) async {
+  Future<void> _delete(Wallet wallet) async {
     final confirmed = await showAdaptiveDialog<bool>(
       context: context,
       builder: (context) => AlertDialog.adaptive(
@@ -55,7 +66,7 @@ class ManageWalletsScreen extends ConsumerWidget {
     final result = await ref
         .read(walletsProvider.notifier)
         .deleteWallet(wallet.id);
-    if (!context.mounted) return;
+    if (!mounted) return;
     final message = switch (result) {
       DeleteWalletResult.deleted => 'Wallet deleted.',
       DeleteWalletResult.archived =>
@@ -69,14 +80,80 @@ class ManageWalletsScreen extends ConsumerWidget {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _confirmBulkDelete() async {
+    final count = _selectedIds.length;
+    final confirmed = await showAdaptiveDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog.adaptive(
+        title: Text('Delete $count wallet${count == 1 ? '' : 's'}?'),
+        content: const Text(
+          'Wallets still holding transactions are archived instead of '
+          'removed; the default wallet and your last remaining wallet are '
+          'always kept.',
+        ),
+        actions: [
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, true),
+            isDestructive: true,
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final results = await ref
+        .read(walletsProvider.notifier)
+        .deleteWallets(_selectedIds);
+    if (!mounted) return;
+    _cancelSelection();
+
+    final deleted = results.where((r) => r == DeleteWalletResult.deleted).length;
+    final archived = results.where((r) => r == DeleteWalletResult.archived).length;
+    final skipped = results.length - deleted - archived;
+    final parts = [
+      if (deleted > 0) '$deleted deleted',
+      if (archived > 0) '$archived archived',
+      if (skipped > 0) '$skipped skipped',
+    ];
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(parts.join(', '))));
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final wallets = ref.watch(activeWalletsProvider);
     final isApple = isApplePlatform(context);
 
     return AdaptiveSliverScaffold(
       title: 'Wallets',
       largeTitle: false,
+      actions: [
+        SelectionToggleAction(
+          selecting: _selecting,
+          onPressed: () {
+            if (_selecting) {
+              _cancelSelection();
+            } else {
+              setState(() => _selecting = true);
+            }
+          },
+        ),
+      ],
+      bottomBar: _selecting
+          ? SelectionBar(
+              count: _selectedIds.length,
+              onCancel: _cancelSelection,
+              onDelete: _selectedIds.isEmpty ? null : _confirmBulkDelete,
+            )
+          : null,
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.only(top: 8, bottom: 96),
@@ -88,22 +165,40 @@ class ManageWalletsScreen extends ConsumerWidget {
               final wallet = wallets[index];
               final balance = ref.watch(walletBalanceProvider(wallet.id));
               final planned = ref.watch(walletPlannedOutstandingProvider(wallet.id));
+              final selected = _selectedIds.contains(wallet.id);
               return ListTile(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => WalletDetailScreen(walletId: wallet.id),
-                  ),
-                ),
-                leading: Icon(
-                  wallet.isDefault
-                      ? (isApple
-                            ? CupertinoIcons.creditcard_fill
-                            : Icons.account_balance_wallet)
-                      : (isApple
-                            ? CupertinoIcons.creditcard
-                            : Icons.account_balance_wallet_outlined),
-                  color: wallet.isDefault ? AppColors.ink : AppColors.muted,
-                ),
+                onTap: _selecting
+                    ? () => setState(() {
+                        if (!_selectedIds.remove(wallet.id)) {
+                          _selectedIds.add(wallet.id);
+                        }
+                      })
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => WalletDetailScreen(walletId: wallet.id),
+                        ),
+                      ),
+                leading: _selecting
+                    ? Icon(
+                        selected
+                            ? (isApple
+                                  ? CupertinoIcons.checkmark_circle_fill
+                                  : Icons.check_circle)
+                            : (isApple
+                                  ? CupertinoIcons.circle
+                                  : Icons.radio_button_unchecked),
+                        color: selected ? AppColors.ink : AppColors.muted,
+                      )
+                    : Icon(
+                        wallet.isDefault
+                            ? (isApple
+                                  ? CupertinoIcons.creditcard_fill
+                                  : Icons.account_balance_wallet)
+                            : (isApple
+                                  ? CupertinoIcons.creditcard
+                                  : Icons.account_balance_wallet_outlined),
+                        color: wallet.isDefault ? AppColors.ink : AppColors.muted,
+                      ),
                 title: Text(
                   wallet.name,
                   style: const TextStyle(fontWeight: FontWeight.w600),
@@ -131,28 +226,30 @@ class ManageWalletsScreen extends ConsumerWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(width: 4),
-                    AdaptiveMenuButton(
-                      tooltip: 'Wallet actions',
-                      items: [
-                        if (!wallet.isDefault)
+                    if (!_selecting) ...[
+                      const SizedBox(width: 4),
+                      AdaptiveMenuButton(
+                        tooltip: 'Wallet actions',
+                        items: [
+                          if (!wallet.isDefault)
+                            AdaptiveMenuItem(
+                              label: 'Set as default',
+                              onSelected: () => ref
+                                  .read(walletsProvider.notifier)
+                                  .setDefaultWallet(wallet.id),
+                            ),
                           AdaptiveMenuItem(
-                            label: 'Set as default',
-                            onSelected: () => ref
-                                .read(walletsProvider.notifier)
-                                .setDefaultWallet(wallet.id),
+                            label: 'Rename',
+                            onSelected: () => _openForm(wallet: wallet),
                           ),
-                        AdaptiveMenuItem(
-                          label: 'Rename',
-                          onSelected: () => _openForm(context, wallet: wallet),
-                        ),
-                        AdaptiveMenuItem(
-                          label: 'Delete',
-                          isDestructive: true,
-                          onSelected: () => _delete(context, ref, wallet),
-                        ),
-                      ],
-                    ),
+                          AdaptiveMenuItem(
+                            label: 'Delete',
+                            isDestructive: true,
+                            onSelected: () => _delete(wallet),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -161,7 +258,7 @@ class ManageWalletsScreen extends ConsumerWidget {
         ),
       ],
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _openForm(context),
+        onPressed: () => _openForm(),
         child: const Icon(Icons.add),
       ),
     );

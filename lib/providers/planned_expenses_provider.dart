@@ -64,6 +64,16 @@ class PlannedExpensesNotifier extends Notifier<List<PlannedExpense>> {
     _refresh();
   }
 
+  Future<void> deleteItems(Iterable<String> ids) async {
+    final syncService = ref.read(syncServiceProvider);
+    final box = ref.read(plannedExpensesBoxProvider);
+    for (final id in ids) {
+      await syncService.recordDelete('planned_expenses', id);
+      await box.delete(id);
+    }
+    _refresh();
+  }
+
   /// Copies every item from one month into another, leaving the source
   /// month untouched. Returns how many items were copied.
   Future<int> cloneMonth({

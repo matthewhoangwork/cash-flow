@@ -18,6 +18,9 @@ class TransactionTile extends StatelessWidget {
     required this.onDismissed,
     this.walletName,
     this.onTogglePlanned,
+    this.selecting = false,
+    this.selected = false,
+    this.onToggleSelected,
   });
 
   final Transaction transaction;
@@ -32,6 +35,12 @@ class TransactionTile extends StatelessWidget {
   /// When set and the transaction is planned, a checkbox is shown that marks
   /// it paid on tap. Null hides the checkbox.
   final VoidCallback? onTogglePlanned;
+
+  /// True while the list is in multi-select mode: swipe-to-delete is
+  /// disabled and a selection checkbox replaces the row's normal tap action.
+  final bool selecting;
+  final bool selected;
+  final VoidCallback? onToggleSelected;
 
   Future<bool> _confirmDelete(BuildContext context) async {
     final sign = transaction.type == TransactionType.income ? '+' : '-';
@@ -68,7 +77,127 @@ class TransactionTile extends StatelessWidget {
     final amountColor = isIncome ? AppColors.income : AppColors.expense;
     final sign = isIncome ? '+' : '-';
     final isPlanned = transaction.planned;
-    final showPlannedCheckbox = isPlanned && onTogglePlanned != null;
+    final showPlannedCheckbox = isPlanned && onTogglePlanned != null && !selecting;
+
+    final row = InkWell(
+      onTap: selecting ? onToggleSelected : onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            if (selecting)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Icon(
+                  selected
+                      ? (isApplePlatform(context)
+                            ? CupertinoIcons.checkmark_circle_fill
+                            : Icons.check_circle)
+                      : (isApplePlatform(context)
+                            ? CupertinoIcons.circle
+                            : Icons.radio_button_unchecked),
+                  size: 24,
+                  color: selected ? AppColors.ink : AppColors.muted,
+                ),
+              ),
+            if (showPlannedCheckbox)
+              GestureDetector(
+                onTap: onTogglePlanned,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Icon(
+                    isApplePlatform(context)
+                        ? CupertinoIcons.circle
+                        : Icons.check_box_outline_blank,
+                    size: 24,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ),
+            Opacity(
+              opacity: isPlanned ? 0.55 : 1,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: palette.background,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  categoryIcon(category?.iconKey ?? 'more_horiz'),
+                  size: 20,
+                  color: palette.foreground,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          category?.name ?? 'Uncategorized',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isPlanned) ...[
+                        const SizedBox(width: 8),
+                        const _PlannedPill(),
+                      ],
+                    ],
+                  ),
+                  if (transaction.note.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        transaction.note,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '$sign${compactVnd(transaction.amount)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: amountColor,
+                  ),
+                ),
+                if (walletName != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      walletName!,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selecting) return row;
 
     return Dismissible(
       key: ValueKey(transaction.id),
@@ -87,109 +216,7 @@ class TransactionTile extends StatelessWidget {
           color: const Color(0xFF9F2F2D),
         ),
       ),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          child: Row(
-            children: [
-              if (showPlannedCheckbox) ...[
-                GestureDetector(
-                  onTap: onTogglePlanned,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Icon(
-                      isApplePlatform(context)
-                          ? CupertinoIcons.circle
-                          : Icons.check_box_outline_blank,
-                      size: 24,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ),
-              ],
-              Opacity(
-                opacity: isPlanned ? 0.55 : 1,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: palette.background,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    categoryIcon(category?.iconKey ?? 'more_horiz'),
-                    size: 20,
-                    color: palette.foreground,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            category?.name ?? 'Uncategorized',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (isPlanned) ...[
-                          const SizedBox(width: 8),
-                          const _PlannedPill(),
-                        ],
-                      ],
-                    ),
-                    if (transaction.note.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          transaction.note,
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 13,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '$sign${compactVnd(transaction.amount)}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: amountColor,
-                    ),
-                  ),
-                  if (walletName != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        walletName!,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+      child: row,
     );
   }
 }

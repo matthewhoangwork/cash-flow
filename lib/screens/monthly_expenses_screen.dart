@@ -30,6 +30,8 @@ class MonthlyExpensesScreen extends ConsumerStatefulWidget {
 class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
   late int _year;
   late int _month;
+  bool _selecting = false;
+  final Set<String> _selectedIds = {};
 
   @override
   void initState() {
@@ -37,6 +39,13 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
     final now = DateTime.now();
     _year = now.year;
     _month = now.month;
+  }
+
+  void _cancelSelection() {
+    setState(() {
+      _selecting = false;
+      _selectedIds.clear();
+    });
   }
 
   void _shiftMonth(int delta) {
@@ -109,6 +118,36 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
     await ref.read(plannedExpensesProvider.notifier).deleteItem(item.id);
   }
 
+  Future<void> _confirmBulkDelete() async {
+    final count = _selectedIds.length;
+    final confirmed = await showAdaptiveDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog.adaptive(
+        title: Text('Delete $count item${count == 1 ? '' : 's'}?'),
+        content: const Text(
+          'This will permanently delete the selected planned expenses.',
+        ),
+        actions: [
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, true),
+            isDestructive: true,
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(plannedExpensesProvider.notifier).deleteItems(_selectedIds);
+    if (!mounted) return;
+    _cancelSelection();
+  }
+
   @override
   Widget build(BuildContext context) {
     final allItems = ref.watch(plannedExpensesProvider);
@@ -123,14 +162,32 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
       title: 'Monthly expenses',
       largeTitle: false,
       actions: [
-        if (items.isNotEmpty)
+        if (items.isNotEmpty) ...[
+          SelectionToggleAction(
+            selecting: _selecting,
+            onPressed: () {
+              if (_selecting) {
+                _cancelSelection();
+              } else {
+                setState(() => _selecting = true);
+              }
+            },
+          ),
           AdaptiveNavAction(
             materialIcon: Icons.copy_all_outlined,
             cupertinoIcon: CupertinoIcons.doc_on_doc,
             tooltip: 'Clone to next month',
             onPressed: _cloneToNextMonth,
           ),
+        ],
       ],
+      bottomBar: _selecting
+          ? SelectionBar(
+              count: _selectedIds.length,
+              onCancel: _cancelSelection,
+              onDelete: _selectedIds.isEmpty ? null : _confirmBulkDelete,
+            )
+          : null,
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
@@ -215,6 +272,22 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
                 final category = item.categoryId == null
                     ? null
                     : findCategory(categories, item.categoryId!);
+                final tile = _PlannedExpenseTile(
+                  item: item,
+                  category: category,
+                  onTap: _selecting
+                      ? () => setState(() {
+                          if (!_selectedIds.remove(item.id)) {
+                            _selectedIds.add(item.id);
+                          }
+                        })
+                      : () => _openForm(item: item),
+                  selecting: _selecting,
+                  selected: _selectedIds.contains(item.id),
+                );
+
+                if (_selecting) return tile;
+
                 return Dismissible(
                   key: ValueKey(item.id),
                   direction: DismissDirection.endToStart,
@@ -230,11 +303,7 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
                       color: const Color(0xFF9F2F2D),
                     ),
                   ),
-                  child: _PlannedExpenseTile(
-                    item: item,
-                    category: category,
-                    onTap: () => _openForm(item: item),
-                  ),
+                  child: tile,
                 );
               },
             ),
@@ -253,11 +322,15 @@ class _PlannedExpenseTile extends StatelessWidget {
     required this.item,
     required this.category,
     required this.onTap,
+    this.selecting = false,
+    this.selected = false,
   });
 
   final PlannedExpense item;
   final Category? category;
   final VoidCallback onTap;
+  final bool selecting;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -268,6 +341,21 @@ class _PlannedExpenseTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
+            if (selecting)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Icon(
+                  selected
+                      ? (isApplePlatform(context)
+                            ? CupertinoIcons.checkmark_circle_fill
+                            : Icons.check_circle)
+                      : (isApplePlatform(context)
+                            ? CupertinoIcons.circle
+                            : Icons.radio_button_unchecked),
+                  size: 24,
+                  color: selected ? AppColors.ink : AppColors.muted,
+                ),
+              ),
             Container(
               width: 40,
               height: 40,

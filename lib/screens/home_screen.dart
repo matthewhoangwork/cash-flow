@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/transaction.dart';
 import '../providers/categories_provider.dart';
 import '../providers/summary_providers.dart';
 import '../providers/transactions_provider.dart';
@@ -24,11 +25,64 @@ import 'monthly_expenses_screen.dart';
 
 enum _ChartGranularity { daily, weekly }
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _selecting = false;
+  final Set<String> _selectedIds = {};
+
+  void _toggleSelected(Transaction transaction) {
+    setState(() {
+      if (!_selectedIds.remove(transaction.id)) {
+        _selectedIds.add(transaction.id);
+      }
+    });
+  }
+
+  void _cancelSelection() {
+    setState(() {
+      _selecting = false;
+      _selectedIds.clear();
+    });
+  }
+
+  Future<void> _confirmBulkDelete() async {
+    final count = _selectedIds.length;
+    final confirmed = await showAdaptiveDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog.adaptive(
+        title: Text('Delete $count transaction${count == 1 ? '' : 's'}?'),
+        content: const Text(
+          'This will permanently delete the selected transactions.',
+        ),
+        actions: [
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, true),
+            isDestructive: true,
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(transactionsProvider.notifier).deleteTransactions(_selectedIds);
+    if (!mounted) return;
+    _cancelSelection();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final transactions = ref.watch(transactionsProvider);
     final categories = ref.watch(categoriesProvider);
     final balance = ref.watch(balanceProvider);
@@ -40,6 +94,13 @@ class HomeScreen extends ConsumerWidget {
     final showWalletTag = ref.watch(activeWalletsProvider).length > 1;
     return AdaptiveSliverScaffold(
       title: 'Cash',
+      bottomBar: _selecting
+          ? SelectionBar(
+              count: _selectedIds.length,
+              onCancel: _cancelSelection,
+              onDelete: _selectedIds.isEmpty ? null : _confirmBulkDelete,
+            )
+          : null,
       actions: [
         AdaptiveNavAction(
           materialIcon: Icons.pie_chart_outline,
@@ -60,6 +121,10 @@ class HomeScreen extends ConsumerWidget {
         AdaptiveMenuButton(
           tooltip: 'Manage',
           items: [
+            AdaptiveMenuItem(
+              label: 'Select transactions',
+              onSelected: () => setState(() => _selecting = true),
+            ),
             AdaptiveMenuItem(
               label: 'Manage categories',
               onSelected: () => Navigator.of(context).push(
@@ -201,6 +266,9 @@ class HomeScreen extends ConsumerWidget {
             findWalletName: showWalletTag
                 ? (walletId) => findWallet(wallets, walletId)?.name
                 : null,
+            selecting: _selecting,
+            selectedIds: _selectedIds,
+            onToggleSelected: _toggleSelected,
           ),
       ],
       floatingActionButton: FloatingActionButton(

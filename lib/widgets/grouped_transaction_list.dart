@@ -21,6 +21,9 @@ class GroupedTransactionList extends StatelessWidget {
     required this.findCategory,
     this.findWalletName,
     this.onTogglePlanned,
+    this.selecting = false,
+    this.selectedIds = const {},
+    this.onToggleSelected,
   });
 
   final List<Transaction> transactions;
@@ -34,6 +37,11 @@ class GroupedTransactionList extends StatelessWidget {
   /// Called when a planned transaction's checkbox is ticked to mark it paid.
   /// Null hides the checkbox (e.g. contexts where paying isn't offered).
   final void Function(Transaction)? onTogglePlanned;
+
+  /// True while the list is in multi-select mode.
+  final bool selecting;
+  final Set<String> selectedIds;
+  final void Function(Transaction)? onToggleSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +117,10 @@ class GroupedTransactionList extends StatelessWidget {
             onDismissed: () => onDismissed(transaction),
             onTogglePlanned:
                 onTogglePlanned == null ? null : () => onTogglePlanned!(transaction),
+            selecting: selecting,
+            selected: selectedIds.contains(transaction.id),
+            onToggleSelected:
+                onToggleSelected == null ? null : () => onToggleSelected!(transaction),
           );
         }, childCount: items.length),
       ),

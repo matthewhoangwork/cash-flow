@@ -72,6 +72,31 @@ class CategoriesNotifier extends Notifier<List<Category>> {
     }
     _refresh();
   }
+
+  /// Bulk version of [deleteCategory]: each id is archived or removed
+  /// following the same in-use rule.
+  Future<void> deleteCategories(Iterable<String> ids) async {
+    final categoriesBox = ref.read(categoriesBoxProvider);
+    final transactionsBox = ref.read(transactionsBoxProvider);
+    final syncService = ref.read(syncServiceProvider);
+    var archivedAny = false;
+    for (final id in ids) {
+      final inUse = transactionsBox.values.any((t) => t.categoryId == id);
+      if (inUse) {
+        final category = categoriesBox.get(id);
+        if (category == null) continue;
+        category.isArchived = true;
+        category.updatedAt = DateTime.now().toUtc();
+        await category.save();
+        archivedAny = true;
+      } else {
+        await syncService.recordDelete('categories', id);
+        await categoriesBox.delete(id);
+      }
+    }
+    _refresh();
+    if (archivedAny) syncService.schedulePush();
+  }
 }
 
 final categoriesProvider =

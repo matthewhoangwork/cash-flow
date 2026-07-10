@@ -112,6 +112,82 @@ Future<DateTime?> showAdaptiveDatePicker({
   );
 }
 
+/// A top-bar toggle for entering/exiting multi-select mode: a checklist
+/// glyph when off, an "x" when on (tapping either exits or enters).
+class SelectionToggleAction extends StatelessWidget {
+  const SelectionToggleAction({
+    required this.selecting,
+    required this.onPressed,
+    super.key,
+  });
+
+  final bool selecting;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AdaptiveNavAction(
+      materialIcon: selecting ? Icons.close : Icons.checklist,
+      cupertinoIcon: selecting
+          ? CupertinoIcons.xmark
+          : CupertinoIcons.checkmark_circle,
+      tooltip: selecting ? 'Cancel' : 'Select',
+      onPressed: onPressed,
+    );
+  }
+}
+
+/// The bottom bar shown while multi-select is active: a selection count on
+/// the left, Cancel and a destructive Delete on the right. [onDelete] null
+/// disables the delete action (nothing selected yet).
+class SelectionBar extends StatelessWidget {
+  const SelectionBar({
+    required this.count,
+    required this.onCancel,
+    required this.onDelete,
+    super.key,
+  });
+
+  final int count;
+  final VoidCallback onCancel;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '$count selected',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            adaptiveDialogAction(
+              context: context,
+              onPressed: onCancel,
+              child: const Text('Cancel'),
+            ),
+            adaptiveDialogAction(
+              context: context,
+              onPressed: onDelete,
+              isDestructive: true,
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// A top-bar action button: a compact borderless [CupertinoButton] with the
 /// Cupertino glyph on iOS/macOS (sized to sit inside a
 /// [CupertinoSliverNavigationBar]'s trailing slot), an [IconButton] with the
