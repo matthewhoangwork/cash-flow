@@ -30,22 +30,10 @@ create table public.transactions (
   amount double precision not null,
   category_id uuid not null references public.categories(id),
   wallet_id uuid not null references public.wallets(id),
-  date timestamptz not null,
+  -- Null while `planned` is true and no due date has been set yet.
+  date timestamptz,
   note text not null default '',
   planned boolean not null default false,
-  is_deleted boolean not null default false,
-  updated_at timestamptz not null default now()
-);
-
-create table public.planned_expenses (
-  id uuid primary key,
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  name text not null,
-  amount double precision not null,
-  year integer not null,
-  month integer not null,
-  category_id uuid references public.categories(id),
-  note text not null default '',
   is_deleted boolean not null default false,
   updated_at timestamptz not null default now()
 );
@@ -54,25 +42,28 @@ create table public.planned_expenses (
 alter table public.transactions
   add column if not exists planned boolean not null default false;
 
+-- For projects created before `date` became optional (planned transactions
+-- can now be created without a due date), run this once:
+alter table public.transactions alter column date drop not null;
+
+-- The standalone "monthly expenses" checklist has been folded into planned
+-- transactions above; drop its table if it exists from an older install:
+drop table if exists public.planned_expenses;
+
 create index wallets_user_id_idx on public.wallets(user_id);
 create index categories_user_id_idx on public.categories(user_id);
 create index transactions_user_id_idx on public.transactions(user_id);
 create index transactions_user_id_date_idx on public.transactions(user_id, date desc);
-create index planned_expenses_user_id_idx on public.planned_expenses(user_id);
-create index planned_expenses_user_id_year_month_idx on public.planned_expenses(user_id, year, month);
 
 alter table public.wallets enable row level security;
 alter table public.categories enable row level security;
 alter table public.transactions enable row level security;
-alter table public.planned_expenses enable row level security;
 
 create policy "wallets_owner_all" on public.wallets
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "categories_owner_all" on public.categories
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "transactions_owner_all" on public.transactions
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "planned_expenses_owner_all" on public.planned_expenses
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Rejects an incoming UPDATE that is older than what's already stored, so an
@@ -94,6 +85,4 @@ create trigger wallets_reject_stale before update on public.wallets
 create trigger categories_reject_stale before update on public.categories
   for each row execute function public.reject_stale_write();
 create trigger transactions_reject_stale before update on public.transactions
-  for each row execute function public.reject_stale_write();
-create trigger planned_expenses_reject_stale before update on public.planned_expenses
   for each row execute function public.reject_stale_write();

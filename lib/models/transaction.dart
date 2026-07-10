@@ -11,7 +11,7 @@ class Transaction extends HiveObject {
     required this.type,
     required this.amount,
     required this.categoryId,
-    required this.date,
+    this.date,
     this.note = '',
     required this.walletId,
     this.planned = false,
@@ -30,8 +30,11 @@ class Transaction extends HiveObject {
   @HiveField(3)
   String categoryId;
 
+  /// When to pay/settle. Required for a real (non-[planned]) transaction, but
+  /// optional while [planned] is true — a planned item may not have a known
+  /// due date yet. Stamped with today's date by [markPaid] on settlement.
   @HiveField(4)
-  DateTime date;
+  DateTime? date;
 
   @HiveField(5)
   String note;

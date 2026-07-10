@@ -6,7 +6,6 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'models/category.dart';
-import 'models/planned_expense.dart';
 import 'models/transaction.dart';
 import 'models/transaction_type.dart';
 import 'models/wallet.dart';
@@ -29,13 +28,11 @@ Future<void> main() async {
   Hive.registerAdapter(CategoryAdapter());
   Hive.registerAdapter(TransactionAdapter());
   Hive.registerAdapter(WalletAdapter());
-  Hive.registerAdapter(PlannedExpenseAdapter());
 
   final categoriesBox = await Hive.openBox<Category>('categories');
   final transactionsBox = await Hive.openBox<Transaction>('transactions');
   final walletsBox = await Hive.openBox<Wallet>('wallets');
   final pendingDeletesBox = await Hive.openBox<Map>('pending_deletes');
-  final plannedExpensesBox = await Hive.openBox<PlannedExpense>('planned_expenses');
   // Defaults are seeded lazily by SyncService, only once a pull confirms the
   // signed-in account has no cloud data — seeding here unconditionally would
   // create a fresh, differently-ID'd set of "defaults" on every new device,
@@ -48,7 +45,6 @@ Future<void> main() async {
         transactionsBoxProvider.overrideWithValue(transactionsBox),
         walletsBoxProvider.overrideWithValue(walletsBox),
         pendingDeletesBoxProvider.overrideWithValue(pendingDeletesBox),
-        plannedExpensesBoxProvider.overrideWithValue(plannedExpensesBox),
       ],
       child: const CashApp(),
     ),

@@ -12,8 +12,14 @@ class TransactionsNotifier extends Notifier<List<Transaction>> {
   @override
   List<Transaction> build() => _sorted(ref.read(transactionsBoxProvider).values.toList());
 
+  /// Newest first; a planned transaction with no due date yet sorts above
+  /// everything else since it still needs attention.
   List<Transaction> _sorted(List<Transaction> list) {
-    list.sort((a, b) => b.date.compareTo(a.date));
+    list.sort((a, b) {
+      if (a.date == null) return b.date == null ? 0 : -1;
+      if (b.date == null) return 1;
+      return b.date!.compareTo(a.date!);
+    });
     return list;
   }
 
@@ -25,7 +31,7 @@ class TransactionsNotifier extends Notifier<List<Transaction>> {
     required TransactionType type,
     required double amount,
     required String categoryId,
-    required DateTime date,
+    DateTime? date,
     String note = '',
     required String walletId,
     bool planned = false,

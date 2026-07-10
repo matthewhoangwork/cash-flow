@@ -99,9 +99,10 @@ class DailyTotal {
 }
 
 /// The default wallet's balance across all of its transactions strictly
-/// before [endExclusive].
+/// before [endExclusive]. Undated (planned, no due date yet) transactions
+/// have no place on the timeline, so they're excluded here.
 double _balanceBefore(List<Transaction> walletTransactions, DateTime endExclusive) {
-  return walletTransactions.where((t) => t.date.isBefore(endExclusive)).fold(
+  return walletTransactions.where((t) => t.date != null && t.date!.isBefore(endExclusive)).fold(
       0.0, (sum, t) => sum + (t.type == TransactionType.income ? t.amount : -t.amount));
 }
 
@@ -115,7 +116,11 @@ final weeklyBreakdownProvider = Provider<List<DailyTotal>>((ref) {
   return List.generate(7, (i) {
     final day = monday.add(Duration(days: i));
     final dayTransactions = transactions.where(
-      (t) => t.date.year == day.year && t.date.month == day.month && t.date.day == day.day,
+      (t) =>
+          t.date != null &&
+          t.date!.year == day.year &&
+          t.date!.month == day.month &&
+          t.date!.day == day.day,
     );
     final income = dayTransactions
         .where((t) => t.type == TransactionType.income)
@@ -162,7 +167,7 @@ final weeklyOverWeeksProvider = Provider<List<WeeklyTotal>>((ref) {
     final weekEnd = weekStart.add(const Duration(days: 6));
     final nextWeekStart = weekStart.add(const Duration(days: 7));
     final weekTransactions = transactions.where(
-      (t) => !t.date.isBefore(weekStart) && t.date.isBefore(nextWeekStart),
+      (t) => t.date != null && !t.date!.isBefore(weekStart) && t.date!.isBefore(nextWeekStart),
     );
     final income = weekTransactions
         .where((t) => t.type == TransactionType.income)

@@ -21,7 +21,7 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       type: fields[1] as TransactionType,
       amount: (fields[2] as num).toDouble(),
       categoryId: fields[3] as String,
-      date: fields[4] as DateTime,
+      date: fields[4] as DateTime?,
       note: fields[5] == null ? '' : fields[5] as String,
       walletId: fields[6] == null ? '' : fields[6] as String,
       planned: fields[8] == null ? false : fields[8] as bool,

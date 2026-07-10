@@ -39,7 +39,8 @@ class GroupedTransactionList extends StatelessWidget {
   Widget build(BuildContext context) {
     final groups = <_DayGroup>[];
     for (final transaction in transactions) {
-      final day = DateTime(transaction.date.year, transaction.date.month, transaction.date.day);
+      final date = transaction.date;
+      final day = date == null ? null : DateTime(date.year, date.month, date.day);
       if (groups.isEmpty || groups.last.day != day) {
         groups.add(_DayGroup(day));
       }
@@ -67,7 +68,7 @@ class GroupedTransactionList extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    relativeDayLabel(group.day),
+                    group.day == null ? 'No due date' : relativeDayLabel(group.day!),
                     style: const TextStyle(
                       color: AppColors.muted,
                       fontSize: 12,
@@ -119,7 +120,8 @@ class GroupedTransactionList extends StatelessWidget {
 class _DayGroup {
   _DayGroup(this.day);
 
-  final DateTime day;
+  /// Null for the "no due date" group of planned transactions without a set date.
+  final DateTime? day;
   final List<Transaction> transactions = [];
 
   double get income => transactions
