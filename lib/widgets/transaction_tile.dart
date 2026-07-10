@@ -138,7 +138,7 @@ class TransactionTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '$sign${vndFormat.format(transaction.amount)}',
+                    '$sign${compactVnd(transaction.amount)}',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       color: amountColor,

@@ -121,7 +121,7 @@ class _CategoryBreakdownScreenState
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        vndFormat.format(item.amount),
+                        compactVnd(item.amount),
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ],

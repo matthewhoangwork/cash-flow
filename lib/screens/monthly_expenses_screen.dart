@@ -147,7 +147,7 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  vndFormat.format(total),
+                  compactVnd(total),
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
@@ -281,7 +281,7 @@ class _PlannedExpenseTile extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              vndFormat.format(item.amount),
+              compactVnd(item.amount),
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ],

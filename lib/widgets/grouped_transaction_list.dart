@@ -78,7 +78,7 @@ class GroupedTransactionList extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        '+${vndFormat.format(group.income)}',
+                        '+${compactVnd(group.income)}',
                         style: TextStyle(
                           color: group.income > 0 ? AppColors.income : AppColors.muted,
                           fontSize: 12,
@@ -87,7 +87,7 @@ class GroupedTransactionList extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '-${vndFormat.format(group.expense)}',
+                        '-${compactVnd(group.expense)}',
                         style: TextStyle(
                           color: group.expense > 0 ? AppColors.expense : AppColors.muted,
                           fontSize: 12,

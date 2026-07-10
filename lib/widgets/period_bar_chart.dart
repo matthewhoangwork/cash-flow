@@ -358,9 +358,9 @@ class _DivergingChartPainter extends CustomPainter {
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
           ),
           TextSpan(
-            text: 'Income  ${vndFormat.format(bar.income)}\n'
-                'Expense  ${vndFormat.format(bar.expense)}\n'
-                'Balance  ${bar.balance == null ? 'Not paid yet' : vndFormat.format(bar.balance)}',
+            text: 'Income  ${compactVnd(bar.income)}\n'
+                'Expense  ${compactVnd(bar.expense)}\n'
+                'Balance  ${bar.balance == null ? 'Not paid yet' : compactVnd(bar.balance!)}',
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w500,

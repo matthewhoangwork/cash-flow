@@ -25,16 +25,16 @@ class BalanceWithPlanned extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (planned == 0) {
-      return Text(vndFormat.format(balance), style: amountStyle);
+      return Text(compactVnd(balance), style: amountStyle);
     }
     final annotationStyle = plannedStyle ??
         const TextStyle(color: AppColors.muted, fontSize: 14, fontWeight: FontWeight.w600);
     return Text.rich(
       TextSpan(
         children: [
-          TextSpan(text: vndFormat.format(balance)),
+          TextSpan(text: compactVnd(balance)),
           TextSpan(
-            text: '  (planned ${vndFormat.format(planned)})',
+            text: '  (planned ${compactVnd(planned)})',
             style: annotationStyle,
           ),
         ],

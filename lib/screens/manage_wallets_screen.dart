@@ -117,12 +117,12 @@ class ManageWalletsScreen extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          vndFormat.format(balance),
+                          compactVnd(balance),
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         if (planned != 0)
                           Text(
-                            'planned ${vndFormat.format(planned)}',
+                            'planned ${compactVnd(planned)}',
                             style: const TextStyle(
                               color: AppColors.muted,
                               fontSize: 11,
