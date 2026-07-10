@@ -14,9 +14,13 @@ import '../widgets/adaptive.dart';
 import '../widgets/glass.dart';
 
 class AddEditTransactionScreen extends ConsumerStatefulWidget {
-  const AddEditTransactionScreen({super.key, this.transaction});
+  const AddEditTransactionScreen({super.key, this.transaction, this.initialWalletId});
 
   final model.Transaction? transaction;
+
+  /// Pre-selects this wallet when adding a new transaction (e.g. opened from a
+  /// wallet's detail page). Ignored when editing an existing transaction.
+  final String? initialWalletId;
 
   @override
   ConsumerState<AddEditTransactionScreen> createState() =>
@@ -33,6 +37,7 @@ class _AddEditTransactionScreenState
   String? _categoryId;
   late String _walletId;
   late DateTime _date;
+  late bool _planned;
 
   bool get _isEditing => widget.transaction != null;
 
@@ -42,8 +47,10 @@ class _AddEditTransactionScreenState
     final transaction = widget.transaction;
     _type = transaction?.type ?? TransactionType.expense;
     _categoryId = transaction?.categoryId;
-    _walletId = transaction?.walletId ?? ref.read(defaultWalletProvider).id;
+    _walletId =
+        transaction?.walletId ?? widget.initialWalletId ?? ref.read(defaultWalletProvider).id;
     _date = transaction?.date ?? DateTime.now();
+    _planned = transaction?.planned ?? false;
     if (transaction != null) {
       _amountController.text = transaction.amount.toStringAsFixed(0);
       _noteController.text = transaction.note;
@@ -81,6 +88,7 @@ class _AddEditTransactionScreenState
           date: _date,
           note: _noteController.text.trim(),
           walletId: _walletId,
+          planned: _planned,
         ),
       );
     } else {
@@ -91,6 +99,7 @@ class _AddEditTransactionScreenState
         date: _date,
         note: _noteController.text.trim(),
         walletId: _walletId,
+        planned: _planned,
       );
     }
     Navigator.of(context).pop();
@@ -253,7 +262,7 @@ class _AddEditTransactionScreenState
                 const SizedBox(height: 12),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Date'),
+                  title: Text(_planned ? 'Due date' : 'Date'),
                   subtitle: Text(DateFormat.yMMMd().format(_date)),
                   trailing: Icon(
                     isApplePlatform(context)
@@ -262,6 +271,15 @@ class _AddEditTransactionScreenState
                     size: 18,
                   ),
                   onTap: _pickDate,
+                ),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Planned (not paid yet)'),
+                  subtitle: const Text(
+                    'Still counts against your balance until you mark it paid.',
+                  ),
+                  value: _planned,
+                  onChanged: (value) => setState(() => _planned = value),
                 ),
                 const SizedBox(height: 24),
                 AdaptivePrimaryButton(

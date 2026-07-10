@@ -170,7 +170,16 @@ class AdaptiveSliverScaffold extends StatelessWidget {
     if (!largeTitle) {
       return Scaffold(
         extendBodyBehindAppBar: true,
-        appBar: CupertinoNavigationBar(middle: Text(title), trailing: trailing),
+        // transitionBetweenRoutes is disabled because these Cupertino nav bars
+        // live inside a MaterialApp: the cross-route title Hero would lerp the
+        // Material-derived title TextStyle (inherit: true) against a plain
+        // Cupertino one (inherit: false) on every push/pop, which throws
+        // "Failed to interpolate TextStyles with different inherit values".
+        appBar: CupertinoNavigationBar(
+          middle: Text(title),
+          trailing: trailing,
+          transitionBetweenRoutes: false,
+        ),
         body: Stack(
           children: [
             const Positioned.fill(child: LiquidGlassBackdrop()),
@@ -199,6 +208,9 @@ class AdaptiveSliverScaffold extends StatelessWidget {
                 largeTitle: Text(title),
                 stretch: true,
                 trailing: trailing,
+                // See the note on the compact nav bar above: disabled to avoid
+                // the mismatched-inherit TextStyle lerp during route flights.
+                transitionBetweenRoutes: false,
               ),
               ...slivers,
             ],
