@@ -20,7 +20,7 @@ import 'add_edit_transaction_screen.dart';
 import 'category_breakdown_screen.dart';
 import 'manage_categories_screen.dart';
 import 'manage_wallets_screen.dart';
-import 'monthly_expenses_screen.dart';
+import 'planned_screen.dart';
 
 enum _ChartGranularity { daily, weekly }
 
@@ -52,9 +52,9 @@ class HomeScreen extends ConsumerWidget {
         AdaptiveNavAction(
           materialIcon: Icons.calendar_month_outlined,
           cupertinoIcon: CupertinoIcons.calendar,
-          tooltip: 'Monthly expenses',
+          tooltip: 'Planned',
           onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const MonthlyExpensesScreen()),
+            MaterialPageRoute(builder: (_) => const PlannedScreen()),
           ),
         ),
         AdaptiveMenuButton(

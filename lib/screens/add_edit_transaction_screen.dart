@@ -15,13 +15,22 @@ import '../widgets/adaptive.dart';
 import '../widgets/glass.dart';
 
 class AddEditTransactionScreen extends ConsumerStatefulWidget {
-  const AddEditTransactionScreen({super.key, this.transaction, this.initialWalletId});
+  const AddEditTransactionScreen({
+    super.key,
+    this.transaction,
+    this.initialWalletId,
+    this.initialPlanned = false,
+  });
 
   final model.Transaction? transaction;
 
   /// Pre-selects this wallet when adding a new transaction (e.g. opened from a
   /// wallet's detail page). Ignored when editing an existing transaction.
   final String? initialWalletId;
+
+  /// Pre-checks "Planned" when adding a new transaction (e.g. opened from the
+  /// Planned page). Ignored when editing an existing transaction.
+  final bool initialPlanned;
 
   @override
   ConsumerState<AddEditTransactionScreen> createState() =>
@@ -37,7 +46,7 @@ class _AddEditTransactionScreenState
   late TransactionType _type;
   String? _categoryId;
   late String _walletId;
-  late DateTime _date;
+  DateTime? _date;
   late bool _planned;
 
   bool get _isEditing => widget.transaction != null;
@@ -50,8 +59,10 @@ class _AddEditTransactionScreenState
     _categoryId = transaction?.categoryId;
     _walletId =
         transaction?.walletId ?? widget.initialWalletId ?? ref.read(defaultWalletProvider).id;
-    _date = transaction?.date ?? DateTime.now();
-    _planned = transaction?.planned ?? false;
+    _planned = transaction?.planned ?? widget.initialPlanned;
+    // A real (non-planned) transaction always needs a date; a planned one
+    // may not have a due date yet, so leave it unset for a fresh planned add.
+    _date = transaction != null ? transaction.date : (_planned ? null : DateTime.now());
     if (transaction != null) {
       _amountController.text = _amountToThousands(transaction.amount);
       _noteController.text = transaction.note;
@@ -76,11 +87,15 @@ class _AddEditTransactionScreenState
 
   void _submit() {
     final formValid = _formKey.currentState!.validate();
-    if (!formValid || _categoryId == null) {
+    if (!formValid || _categoryId == null || (!_planned && _date == null)) {
       if (_categoryId == null) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Pick a category')));
+      } else if (!_planned && _date == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Pick a date')));
       }
       return;
     }
@@ -119,7 +134,7 @@ class _AddEditTransactionScreenState
   Future<void> _pickDate() async {
     final picked = await showAdaptiveDatePicker(
       context: context,
-      initialDate: _date,
+      initialDate: _date ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
@@ -284,18 +299,6 @@ class _AddEditTransactionScreenState
                   ),
                 ),
                 const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(_planned ? 'Due date' : 'Date'),
-                  subtitle: Text(DateFormat.yMMMd().format(_date)),
-                  trailing: Icon(
-                    isApplePlatform(context)
-                        ? CupertinoIcons.calendar
-                        : Icons.calendar_today_outlined,
-                    size: 18,
-                  ),
-                  onTap: _pickDate,
-                ),
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Planned (not paid yet)'),
@@ -303,7 +306,36 @@ class _AddEditTransactionScreenState
                     'Still counts against your balance until you mark it paid.',
                   ),
                   value: _planned,
-                  onChanged: (value) => setState(() => _planned = value),
+                  onChanged: (value) => setState(() {
+                    _planned = value;
+                    // A real transaction always needs a date.
+                    if (!value && _date == null) _date = DateTime.now();
+                  }),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(_planned ? 'Due date (optional)' : 'Date'),
+                  subtitle: Text(
+                    _date == null ? 'No due date set' : DateFormat.yMMMd().format(_date!),
+                  ),
+                  trailing: _planned && _date != null
+                      ? IconButton(
+                          icon: Icon(
+                            isApplePlatform(context)
+                                ? CupertinoIcons.clear_circled
+                                : Icons.clear,
+                            size: 18,
+                          ),
+                          tooltip: 'Clear date',
+                          onPressed: () => setState(() => _date = null),
+                        )
+                      : Icon(
+                          isApplePlatform(context)
+                              ? CupertinoIcons.calendar
+                              : Icons.calendar_today_outlined,
+                          size: 18,
+                        ),
+                  onTap: _pickDate,
                 ),
                 const SizedBox(height: 24),
                 AdaptivePrimaryButton(
