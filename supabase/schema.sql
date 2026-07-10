@@ -32,6 +32,7 @@ create table public.transactions (
   wallet_id uuid not null references public.wallets(id),
   date timestamptz not null,
   note text not null default '',
+  planned boolean not null default false,
   is_deleted boolean not null default false,
   updated_at timestamptz not null default now()
 );
@@ -48,6 +49,10 @@ create table public.planned_expenses (
   is_deleted boolean not null default false,
   updated_at timestamptz not null default now()
 );
+
+-- For projects created before the `planned` column existed, run this once:
+alter table public.transactions
+  add column if not exists planned boolean not null default false;
 
 create index wallets_user_id_idx on public.wallets(user_id);
 create index categories_user_id_idx on public.categories(user_id);

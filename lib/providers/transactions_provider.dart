@@ -28,6 +28,7 @@ class TransactionsNotifier extends Notifier<List<Transaction>> {
     required DateTime date,
     String note = '',
     required String walletId,
+    bool planned = false,
   }) async {
     final transaction = Transaction(
       id: _uuid.v4(),
@@ -37,9 +38,23 @@ class TransactionsNotifier extends Notifier<List<Transaction>> {
       date: date,
       note: note,
       walletId: walletId,
+      planned: planned,
       updatedAt: DateTime.now().toUtc(),
     );
     await ref.read(transactionsBoxProvider).put(transaction.id, transaction);
+    _refresh();
+    ref.read(syncServiceProvider).schedulePush();
+  }
+
+  /// Marks a planned transaction as paid: clears the planned flag and stamps
+  /// today's date, so it settles into the list as an actual transaction.
+  Future<void> markPaid(String id) async {
+    final transaction = ref.read(transactionsBoxProvider).get(id);
+    if (transaction == null || !transaction.planned) return;
+    transaction.planned = false;
+    transaction.date = DateTime.now();
+    transaction.updatedAt = DateTime.now().toUtc();
+    await transaction.save();
     _refresh();
     ref.read(syncServiceProvider).schedulePush();
   }

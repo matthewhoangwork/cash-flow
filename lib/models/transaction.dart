@@ -14,6 +14,7 @@ class Transaction extends HiveObject {
     required this.date,
     this.note = '',
     required this.walletId,
+    this.planned = false,
     this.updatedAt,
   });
 
@@ -40,6 +41,13 @@ class Transaction extends HiveObject {
   /// startup, so app code can treat this as always-populated.
   @HiveField(6, defaultValue: '')
   String walletId;
+
+  /// True while this is a planned ("need to pay") transaction that hasn't been
+  /// paid yet. It still counts toward balance and income/expense totals — like
+  /// a real transaction — so the wallet reflects money already committed. The
+  /// home/wallet lists show a checkbox to mark it paid, which clears this flag.
+  @HiveField(8, defaultValue: false)
+  bool planned;
 
   /// Last local modification time, used by the Supabase sync layer for
   /// last-write-wins conflict resolution. Null means never synced.

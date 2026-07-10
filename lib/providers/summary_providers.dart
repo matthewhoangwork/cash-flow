@@ -32,6 +32,33 @@ final balanceProvider = Provider<double>((ref) {
   return ref.watch(totalIncomeProvider) - ref.watch(totalExpenseProvider);
 });
 
+/// Balance (income minus expense, including still-unpaid planned transactions)
+/// for a single wallet. Used by the Wallets page to show every wallet's total
+/// at a glance, independent of which one is the default.
+final walletBalanceProvider = Provider.family<double, String>((ref, walletId) {
+  return ref.watch(transactionsProvider).where((t) => t.walletId == walletId).fold(
+      0.0, (sum, t) => sum + (t.type == TransactionType.income ? t.amount : -t.amount));
+});
+
+/// Net still-unpaid planned amount for the default wallet — the part of the
+/// balance already committed to planned ("need to pay") transactions that
+/// haven't actually been paid. Positive means a net outflow is still pending;
+/// shown next to the balance as "(planned …)". Balance already nets this out,
+/// so real-balance == balance + plannedOutstanding.
+final plannedOutstandingProvider = Provider<double>((ref) {
+  return ref.watch(walletScopedTransactionsProvider).where((t) => t.planned).fold(
+      0.0, (sum, t) => sum + (t.type == TransactionType.expense ? t.amount : -t.amount));
+});
+
+/// Same as [plannedOutstandingProvider] but for a single wallet — used by the
+/// Wallets list and a wallet's detail page.
+final walletPlannedOutstandingProvider = Provider.family<double, String>((ref, walletId) {
+  return ref
+      .watch(transactionsProvider)
+      .where((t) => t.walletId == walletId && t.planned)
+      .fold(0.0, (sum, t) => sum + (t.type == TransactionType.expense ? t.amount : -t.amount));
+});
+
 class CategoryTotal {
   const CategoryTotal({required this.categoryId, required this.amount});
 

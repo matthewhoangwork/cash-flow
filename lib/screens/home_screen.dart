@@ -4,9 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/category.dart';
-import '../models/transaction.dart';
-import '../models/transaction_type.dart';
 import '../providers/categories_provider.dart';
 import '../providers/summary_providers.dart';
 import '../providers/transactions_provider.dart';
@@ -14,11 +11,11 @@ import '../providers/wallets_provider.dart';
 import '../sync/sync_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/currency_format.dart';
-import '../utils/relative_date.dart';
 import '../widgets/adaptive.dart';
+import '../widgets/balance_with_planned.dart';
 import '../widgets/glass.dart';
+import '../widgets/grouped_transaction_list.dart';
 import '../widgets/period_bar_chart.dart';
-import '../widgets/transaction_tile.dart';
 import 'add_edit_transaction_screen.dart';
 import 'category_breakdown_screen.dart';
 import 'manage_categories_screen.dart';
@@ -35,6 +32,7 @@ class HomeScreen extends ConsumerWidget {
     final transactions = ref.watch(transactionsProvider);
     final categories = ref.watch(categoriesProvider);
     final balance = ref.watch(balanceProvider);
+    final plannedOutstanding = ref.watch(plannedOutstandingProvider);
     final income = ref.watch(totalIncomeProvider);
     final expense = ref.watch(totalExpenseProvider);
     final defaultWallet = ref.watch(defaultWalletProvider);
@@ -71,7 +69,7 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             AdaptiveMenuItem(
-              label: 'Manage wallets',
+              label: 'Wallets',
               onSelected: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ManageWalletsScreen()),
               ),
@@ -143,9 +141,10 @@ class HomeScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    vndFormat.format(balance),
-                    style: const TextStyle(
+                  BalanceWithPlanned(
+                    balance: balance,
+                    planned: plannedOutstanding,
+                    amountStyle: const TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.02,
@@ -185,7 +184,7 @@ class HomeScreen extends ConsumerWidget {
             ),
           )
         else
-          _GroupedTransactionList(
+          GroupedTransactionList(
             transactions: transactions,
             onTap: (transaction) => Navigator.of(context).push(
               MaterialPageRoute(
@@ -196,6 +195,8 @@ class HomeScreen extends ConsumerWidget {
             onDismissed: (transaction) => ref
                 .read(transactionsProvider.notifier)
                 .deleteTransaction(transaction.id),
+            onTogglePlanned: (transaction) =>
+                ref.read(transactionsProvider.notifier).markPaid(transaction.id),
             findCategory: (categoryId) => findCategory(categories, categoryId),
             findWalletName: showWalletTag
                 ? (walletId) => findWallet(wallets, walletId)?.name
@@ -210,138 +211,6 @@ class HomeScreen extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// Groups the (already date-descending) transaction list by calendar day and
-/// renders a relative-date header before each group. The transactions shown
-/// are never filtered — this only changes how the same full list is grouped.
-class _GroupedTransactionList extends StatelessWidget {
-  const _GroupedTransactionList({
-    required this.transactions,
-    required this.onTap,
-    required this.onDismissed,
-    required this.findCategory,
-    this.findWalletName,
-  });
-
-  final List<Transaction> transactions;
-  final void Function(Transaction) onTap;
-  final void Function(Transaction) onDismissed;
-  final Category? Function(String) findCategory;
-
-  /// Null when there's only one active wallet, so tiles skip the tag.
-  final String? Function(String)? findWalletName;
-
-  @override
-  Widget build(BuildContext context) {
-    final groups = <_DayGroup>[];
-    for (final transaction in transactions) {
-      final day = DateTime(
-        transaction.date.year,
-        transaction.date.month,
-        transaction.date.day,
-      );
-      if (groups.isEmpty || groups.last.day != day) {
-        groups.add(_DayGroup(day));
-      }
-      groups.last.transactions.add(transaction);
-    }
-
-    final items = <_ListItem>[];
-    for (final group in groups) {
-      items.add(_ListItem.header(group));
-      for (final transaction in group.transactions) {
-        items.add(_ListItem.transaction(transaction));
-      }
-    }
-
-    return SliverPadding(
-      padding: const EdgeInsets.only(bottom: 96),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate((context, index) {
-          final item = items[index];
-          if (item.header != null) {
-            final group = item.header!;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, index == 0 ? 8 : 20, 20, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    relativeDayLabel(group.day),
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.04,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Text(
-                        '+${vndFormat.format(group.income)}',
-                        style: TextStyle(
-                          color: group.income > 0
-                              ? AppColors.income
-                              : AppColors.muted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '-${vndFormat.format(group.expense)}',
-                        style: TextStyle(
-                          color: group.expense > 0
-                              ? AppColors.expense
-                              : AppColors.muted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          }
-          final transaction = item.transaction!;
-          return TransactionTile(
-            transaction: transaction,
-            category: findCategory(transaction.categoryId),
-            walletName: findWalletName?.call(transaction.walletId),
-            onTap: () => onTap(transaction),
-            onDismissed: () => onDismissed(transaction),
-          );
-        }, childCount: items.length),
-      ),
-    );
-  }
-}
-
-class _DayGroup {
-  _DayGroup(this.day);
-
-  final DateTime day;
-  final List<Transaction> transactions = [];
-
-  double get income => transactions
-      .where((t) => t.type == TransactionType.income)
-      .fold(0.0, (sum, t) => sum + t.amount);
-
-  double get expense => transactions
-      .where((t) => t.type == TransactionType.expense)
-      .fold(0.0, (sum, t) => sum + t.amount);
-}
-
-class _ListItem {
-  const _ListItem._({this.header, this.transaction});
-  factory _ListItem.header(_DayGroup group) => _ListItem._(header: group);
-  factory _ListItem.transaction(Transaction transaction) =>
-      _ListItem._(transaction: transaction);
-
-  final _DayGroup? header;
-  final Transaction? transaction;
 }
 
 class _DashboardChart extends ConsumerStatefulWidget {

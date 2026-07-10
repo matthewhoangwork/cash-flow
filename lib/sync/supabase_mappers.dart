@@ -51,6 +51,7 @@ Map<String, dynamic> transactionToRow(Transaction transaction, String userId) =>
   'wallet_id': transaction.walletId,
   'date': transaction.date.toIso8601String(),
   'note': transaction.note,
+  'planned': transaction.planned,
   'updated_at': transaction.updatedAt!.toIso8601String(),
 };
 
@@ -62,6 +63,7 @@ Transaction transactionFromRow(Map<String, dynamic> row) => Transaction(
   date: DateTime.parse(row['date'] as String),
   note: row['note'] as String,
   walletId: row['wallet_id'] as String,
+  planned: (row['planned'] as bool?) ?? false,
   updatedAt: DateTime.parse(row['updated_at'] as String),
 );
 

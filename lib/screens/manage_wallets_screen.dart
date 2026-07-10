@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/wallet.dart';
+import '../providers/summary_providers.dart';
 import '../providers/wallets_provider.dart';
 import '../theme/app_theme.dart';
+import '../utils/currency_format.dart';
 import '../widgets/adaptive.dart';
 import '../widgets/glass.dart';
+import 'wallet_detail_screen.dart';
 
 class ManageWalletsScreen extends ConsumerWidget {
   const ManageWalletsScreen({super.key});
@@ -72,7 +75,7 @@ class ManageWalletsScreen extends ConsumerWidget {
     final isApple = isApplePlatform(context);
 
     return AdaptiveSliverScaffold(
-      title: 'Manage wallets',
+      title: 'Wallets',
       largeTitle: false,
       slivers: [
         SliverPadding(
@@ -83,18 +86,22 @@ class ManageWalletsScreen extends ConsumerWidget {
                 const Divider(height: 1, indent: 20, endIndent: 20),
             itemBuilder: (context, index) {
               final wallet = wallets[index];
+              final balance = ref.watch(walletBalanceProvider(wallet.id));
+              final planned = ref.watch(walletPlannedOutstandingProvider(wallet.id));
               return ListTile(
-                onTap: () => ref
-                    .read(walletsProvider.notifier)
-                    .setDefaultWallet(wallet.id),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => WalletDetailScreen(walletId: wallet.id),
+                  ),
+                ),
                 leading: Icon(
                   wallet.isDefault
                       ? (isApple
-                            ? CupertinoIcons.checkmark_circle_fill
-                            : Icons.radio_button_checked)
+                            ? CupertinoIcons.creditcard_fill
+                            : Icons.account_balance_wallet)
                       : (isApple
-                            ? CupertinoIcons.circle
-                            : Icons.radio_button_off),
+                            ? CupertinoIcons.creditcard
+                            : Icons.account_balance_wallet_outlined),
                   color: wallet.isDefault ? AppColors.ink : AppColors.muted,
                 ),
                 title: Text(
@@ -105,23 +112,46 @@ class ManageWalletsScreen extends ConsumerWidget {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      icon: Icon(
-                        isApple ? CupertinoIcons.pencil : Icons.edit_outlined,
-                        size: 20,
-                        color: AppColors.muted,
-                      ),
-                      tooltip: 'Rename',
-                      onPressed: () => _openForm(context, wallet: wallet),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          vndFormat.format(balance),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        if (planned != 0)
+                          Text(
+                            'planned ${vndFormat.format(planned)}',
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
                     ),
-                    IconButton(
-                      icon: Icon(
-                        isApple ? CupertinoIcons.trash : Icons.delete_outline,
-                        size: 20,
-                        color: AppColors.muted,
-                      ),
-                      tooltip: 'Delete',
-                      onPressed: () => _delete(context, ref, wallet),
+                    const SizedBox(width: 4),
+                    AdaptiveMenuButton(
+                      tooltip: 'Wallet actions',
+                      items: [
+                        if (!wallet.isDefault)
+                          AdaptiveMenuItem(
+                            label: 'Set as default',
+                            onSelected: () => ref
+                                .read(walletsProvider.notifier)
+                                .setDefaultWallet(wallet.id),
+                          ),
+                        AdaptiveMenuItem(
+                          label: 'Rename',
+                          onSelected: () => _openForm(context, wallet: wallet),
+                        ),
+                        AdaptiveMenuItem(
+                          label: 'Delete',
+                          isDestructive: true,
+                          onSelected: () => _delete(context, ref, wallet),
+                        ),
+                      ],
                     ),
                   ],
                 ),

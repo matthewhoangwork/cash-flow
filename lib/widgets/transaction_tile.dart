@@ -17,6 +17,7 @@ class TransactionTile extends StatelessWidget {
     required this.onTap,
     required this.onDismissed,
     this.walletName,
+    this.onTogglePlanned,
   });
 
   final Transaction transaction;
@@ -28,12 +29,18 @@ class TransactionTile extends StatelessWidget {
   /// more than one wallet; null hides the tag.
   final String? walletName;
 
+  /// When set and the transaction is planned, a checkbox is shown that marks
+  /// it paid on tap. Null hides the checkbox.
+  final VoidCallback? onTogglePlanned;
+
   @override
   Widget build(BuildContext context) {
     final palette = CategoryPalette.of(category?.paletteIndex ?? 7);
     final isIncome = transaction.type == TransactionType.income;
     final amountColor = isIncome ? AppColors.income : AppColors.expense;
     final sign = isIncome ? '+' : '-';
+    final isPlanned = transaction.planned;
+    final showPlannedCheckbox = isPlanned && onTogglePlanned != null;
 
     return Dismissible(
       key: ValueKey(transaction.id),
@@ -57,17 +64,36 @@ class TransactionTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: palette.background,
-                  borderRadius: BorderRadius.circular(10),
+              if (showPlannedCheckbox) ...[
+                GestureDetector(
+                  onTap: onTogglePlanned,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Icon(
+                      isApplePlatform(context)
+                          ? CupertinoIcons.circle
+                          : Icons.check_box_outline_blank,
+                      size: 24,
+                      color: AppColors.muted,
+                    ),
+                  ),
                 ),
-                child: Icon(
-                  categoryIcon(category?.iconKey ?? 'more_horiz'),
-                  size: 20,
-                  color: palette.foreground,
+              ],
+              Opacity(
+                opacity: isPlanned ? 0.55 : 1,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: palette.background,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    categoryIcon(category?.iconKey ?? 'more_horiz'),
+                    size: 20,
+                    color: palette.foreground,
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -75,9 +101,21 @@ class TransactionTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      category?.name ?? 'Uncategorized',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            category?.name ?? 'Uncategorized',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isPlanned) ...[
+                          const SizedBox(width: 8),
+                          const _PlannedPill(),
+                        ],
+                      ],
                     ),
                     if (transaction.note.isNotEmpty)
                       Padding(
@@ -121,6 +159,31 @@ class TransactionTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlannedPill extends StatelessWidget {
+  const _PlannedPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.canvas,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const Text(
+        'PLANNED',
+        style: TextStyle(
+          color: AppColors.muted,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.06,
         ),
       ),
     );
