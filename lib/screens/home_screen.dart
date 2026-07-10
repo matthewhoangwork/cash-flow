@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../providers/categories_provider.dart';
@@ -10,6 +14,7 @@ import '../providers/transactions_provider.dart';
 import '../providers/wallets_provider.dart';
 import '../sync/sync_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/csv_export.dart';
 import '../utils/currency_format.dart';
 import '../widgets/adaptive.dart';
 import '../widgets/balance_with_planned.dart';
@@ -77,6 +82,10 @@ class HomeScreen extends ConsumerWidget {
             AdaptiveMenuItem(
               label: 'Sync now',
               onSelected: () => ref.read(syncServiceProvider).syncNow(),
+            ),
+            AdaptiveMenuItem(
+              label: 'Export to CSV',
+              onSelected: () => _exportTransactionsCsv(context, ref),
             ),
             AdaptiveMenuItem(
               label: 'Sign out',
@@ -210,6 +219,36 @@ class HomeScreen extends ConsumerWidget {
         child: const Icon(Icons.add),
       ),
     );
+  }
+}
+
+Future<void> _exportTransactionsCsv(BuildContext context, WidgetRef ref) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final transactions = ref.read(transactionsProvider);
+  if (transactions.isEmpty) {
+    messenger.showSnackBar(const SnackBar(content: Text('No transactions to export')));
+    return;
+  }
+
+  final csv = transactionsToCsv(
+    transactions,
+    categories: ref.read(categoriesProvider),
+    wallets: ref.read(walletsProvider),
+  );
+  final bytes = Uint8List.fromList(utf8.encode(csv));
+  final fileName = 'cash_transactions_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+
+  final box = context.findRenderObject() as RenderBox?;
+  try {
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile.fromData(bytes, mimeType: 'text/csv', name: fileName)],
+        subject: 'Cash transactions export',
+        sharePositionOrigin: box != null ? box.localToGlobal(Offset.zero) & box.size : null,
+      ),
+    );
+  } catch (_) {
+    messenger.showSnackBar(const SnackBar(content: Text('Could not export transactions')));
   }
 }
 
