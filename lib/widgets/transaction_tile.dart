@@ -33,6 +33,34 @@ class TransactionTile extends StatelessWidget {
   /// it paid on tap. Null hides the checkbox.
   final VoidCallback? onTogglePlanned;
 
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final sign = transaction.type == TransactionType.income ? '+' : '-';
+    final confirmed = await showAdaptiveDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog.adaptive(
+        title: const Text('Delete transaction?'),
+        content: Text(
+          'This will permanently delete "${category?.name ?? 'Uncategorized'}" '
+          '$sign${compactVnd(transaction.amount)}.',
+        ),
+        actions: [
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, true),
+            isDestructive: true,
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = CategoryPalette.of(category?.paletteIndex ?? 7);
@@ -45,6 +73,7 @@ class TransactionTile extends StatelessWidget {
     return Dismissible(
       key: ValueKey(transaction.id),
       direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => _confirmDelete(context),
       onDismissed: (_) => onDismissed(),
       background: Container(
         alignment: Alignment.centerRight,

@@ -79,6 +79,32 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
     );
   }
 
+  Future<bool> _confirmDelete(PlannedExpense item) async {
+    final confirmed = await showAdaptiveDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog.adaptive(
+        title: Text('Delete "${item.name}"?'),
+        content: const Text(
+          'This planned expense will be permanently deleted.',
+        ),
+        actions: [
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          adaptiveDialogAction(
+            context: context,
+            onPressed: () => Navigator.pop(context, true),
+            isDestructive: true,
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
   Future<void> _delete(PlannedExpense item) async {
     await ref.read(plannedExpensesProvider.notifier).deleteItem(item.id);
   }
@@ -192,6 +218,7 @@ class _MonthlyExpensesScreenState extends ConsumerState<MonthlyExpensesScreen> {
                 return Dismissible(
                   key: ValueKey(item.id),
                   direction: DismissDirection.endToStart,
+                  confirmDismiss: (_) => _confirmDelete(item),
                   onDismissed: (_) => _delete(item),
                   background: Container(
                     alignment: Alignment.centerRight,
