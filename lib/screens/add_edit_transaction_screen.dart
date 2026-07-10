@@ -10,6 +10,7 @@ import '../providers/transactions_provider.dart';
 import '../providers/wallets_provider.dart';
 import '../theme/app_theme.dart';
 import '../theme/category_style.dart';
+import '../utils/currency_format.dart';
 import '../widgets/adaptive.dart';
 import '../widgets/glass.dart';
 
@@ -52,9 +53,18 @@ class _AddEditTransactionScreenState
     _date = transaction?.date ?? DateTime.now();
     _planned = transaction?.planned ?? false;
     if (transaction != null) {
-      _amountController.text = transaction.amount.toStringAsFixed(0);
+      _amountController.text = _amountToThousands(transaction.amount);
       _noteController.text = transaction.note;
     }
+  }
+
+  /// The amount field is entered in thousands (type 164 → 164.000 ₫), so map a
+  /// stored amount back to that unit, trimming a redundant trailing ".0".
+  String _amountToThousands(double amount) {
+    final thousands = amount / 1000;
+    return thousands == thousands.roundToDouble()
+        ? thousands.toStringAsFixed(0)
+        : thousands.toString();
   }
 
   @override
@@ -75,7 +85,8 @@ class _AddEditTransactionScreenState
       return;
     }
 
-    final amount = double.parse(_amountController.text);
+    // Field is in thousands (164 → 164.000 ₫), so scale back to full dong.
+    final amount = double.parse(_amountController.text) * 1000;
     final notifier = ref.read(transactionsProvider.notifier);
 
     if (_isEditing) {
@@ -130,6 +141,12 @@ class _AddEditTransactionScreenState
         ? [currentCategory, ...categories]
         : categories;
 
+    // Live preview of the thousands input as a full compact figure ("= 164k").
+    final enteredThousands = double.tryParse(_amountController.text);
+    final amountHint = (enteredThousands == null || enteredThousands <= 0)
+        ? null
+        : '= ${compactVnd(enteredThousands * 1000)}';
+
     final activeWallets = ref.watch(activeWalletsProvider);
     final currentWallet = findWallet(ref.watch(walletsProvider), _walletId);
     final displayedWallets =
@@ -165,8 +182,15 @@ class _AddEditTransactionScreenState
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Amount (₫)'),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Amount (thousands ₫)',
+                    helperText: amountHint,
+                    suffixText: 'k',
+                  ),
+                  onChanged: (_) => setState(() {}),
                   validator: (value) {
                     final parsed = double.tryParse(value ?? '');
                     if (parsed == null || parsed <= 0) {

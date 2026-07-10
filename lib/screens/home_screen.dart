@@ -378,7 +378,7 @@ class _SummaryStat extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          vndFormat.format(amount),
+          compactVnd(amount),
           style: TextStyle(color: color, fontWeight: FontWeight.w600),
         ),
       ],
